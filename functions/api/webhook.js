@@ -120,9 +120,34 @@ async function handleLiffAction(body, env) {
     }), { headers: corsHeaders });
   }
 
+  if (body.action === "syncUser") {
+    const result = await upsertUserToNotion(
+      body.userId || "demo_user",
+      body.displayName || "訪客 (預覽模式)",
+      body.keywords || "",
+      env
+    );
+    return new Response(JSON.stringify({ success: true, ...result }), { headers: corsHeaders });
+  }
+
+  if (body.action === "syncNews") {
+    const result = await syncNewsToNotion(
+      body.userId || "demo_user",
+      body.displayName || "訪客 (預覽模式)",
+      body.items || [],
+      env
+    );
+    return new Response(JSON.stringify({ success: true, ...result }), { headers: corsHeaders });
+  }
+
   if (body.action === "updateKeywords") {
-    const synced = await syncKeywordsToNotion(body.userId || "default_admin", body.keywords || "", env);
-    return new Response(JSON.stringify({ success: true, notionSynced: synced }), { headers: corsHeaders });
+    const result = await upsertUserToNotion(
+      body.userId || "default_admin",
+      body.displayName || "",
+      body.keywords || "",
+      env
+    );
+    return new Response(JSON.stringify({ success: true, notionSynced: result.ok, ...result }), { headers: corsHeaders });
   }
 
   return new Response(JSON.stringify({ success: false, message: "Unknown action" }), { headers: corsHeaders });
@@ -248,31 +273,156 @@ async function createIssueInNotion(ticketId, category, reporter, description, en
 }
 
 /**
- * 同步更新關鍵字至 Notion「AI新聞_用戶設定」資料庫
+ * 依 LINE_UserId 自動查詢或建立/更新 Notion「AI新聞_用戶設定」資料庫
  */
-async function syncKeywordsToNotion(userId, keywords, env) {
+async function upsertUserToNotion(userId, displayName, keywords, env) {
   const token = env?.NOTION_API_KEY;
-  const pageId = "4163f97c-c18d-81e8-bd30-ef81544fef07";
-  if (!token) return false;
+  const dbId = env?.NOTION_SETTINGS_DB_ID || "44b5e6a1-2dbe-4720-8b53-1b20ebd75a9e";
+  if (!token) return { ok: false, reason: "missing_notion_api_key" };
+
+  const headers = {
+    "Authorization": `Bearer ${token}`,
+    "Content-Type": "application/json",
+    "Notion-Version": "2022-06-28"
+  };
 
   try {
-    const res = await fetch(`https://api.notion.com/v1/pages/${pageId}`, {
-      method: "PATCH",
-      headers: {
-        "Authorization": `Bearer ${token}`,
-        "Content-Type": "application/json",
-        "Notion-Version": "2022-06-28"
-      },
-      body: JSON.stringify({
-        properties: {
-          "追蹤關鍵字": { rich_text: [{ text: { content: keywords } }] }
+    // 1. 先查詢是否已有此 LINE_UserId 的紀錄
+    let existingPageId = null;
+    if (userId) {
+      const qRes = await fetch(`https://api.notion.com/v1/databases/${dbId}/query`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          filter: {
+            property: "LINE_UserId",
+            rich_text: { equals: userId }
+          },
+          page_size: 1
+        })
+      });
+      if (qRes.ok) {
+        const qData = await qRes.json();
+        if (qData.results && qData.results.length > 0) {
+          existingPageId = qData.results[0].id;
         }
-      })
-    });
-    return res.ok;
+      }
+    }
+
+    const props = {};
+    if (displayName) {
+      props["用戶名稱"] = { title: [{ text: { content: displayName } }] };
+    }
+    if (keywords) {
+      props["追蹤關鍵字"] = { rich_text: [{ text: { content: keywords } }] };
+    }
+
+    // 2. 若已存在 -> 更新 (PATCH)；否則 -> 新增一列 (POST)
+    if (existingPageId) {
+      if (Object.keys(props).length === 0) return { ok: true, pageId: existingPageId };
+      const uRes = await fetch(`https://api.notion.com/v1/pages/${existingPageId}`, {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({ properties: props })
+      });
+      return { ok: uRes.ok, pageId: existingPageId };
+    } else {
+      props["用戶名稱"] = { title: [{ text: { content: displayName || "LINE 用戶" } }] };
+      props["LINE_UserId"] = { rich_text: [{ text: { content: userId || "demo_user" } }] };
+      if (!props["追蹤關鍵字"]) {
+        props["追蹤關鍵字"] = { rich_text: [{ text: { content: keywords || "具身機器人, 製造業 AI, 智慧工廠" } }] };
+      }
+      const cRes = await fetch("https://api.notion.com/v1/pages", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          parent: { database_id: dbId },
+          properties: props
+        })
+      });
+      const cData = cRes.ok ? await cRes.json() : null;
+      return { ok: cRes.ok, pageId: cData?.id || null };
+    }
   } catch (e) {
-    return false;
+    return { ok: false, reason: String(e) };
   }
+}
+
+/**
+ * 將新聞去重後自動寫入 Notion「AI新聞_今日產出」資料庫，並關聯所屬用戶
+ */
+async function syncNewsToNotion(userId, displayName, newsItems, env) {
+  const token = env?.NOTION_API_KEY;
+  const newsDbId = env?.NOTION_NEWS_DB_ID || "0fd40ae9-c5d0-4dcf-a84b-de7037cd7e29";
+  if (!token) return { ok: false, reason: "missing_notion_api_key", inserted: 0 };
+  if (!Array.isArray(newsItems) || newsItems.length === 0) return { ok: true, inserted: 0 };
+
+  const headers = {
+    "Authorization": `Bearer ${token}`,
+    "Content-Type": "application/json",
+    "Notion-Version": "2022-06-28"
+  };
+
+  try {
+    // 1. 取得用戶的 Notion pageId
+    const userRes = await upsertUserToNotion(userId, displayName, "", env);
+    const userPageId = userRes.pageId;
+
+    // 2. 查詢既有新聞標題避免重複寫入
+    const existingTitles = new Set();
+    const qRes = await fetch(`https://api.notion.com/v1/databases/${newsDbId}/query`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ page_size: 50 })
+    });
+    if (qRes.ok) {
+      const qData = await qRes.json();
+      for (const row of qData.results || []) {
+        const titleArr = row.properties?.["新聞標題"]?.title || [];
+        const t = titleArr.map(x => x.plain_text).join("").trim();
+        if (t) existingTitles.add(t);
+      }
+    }
+
+    const todayStr = new Date(Date.now() + 8 * 3600 * 1000).toISOString().slice(0, 10);
+    let inserted = 0;
+
+    for (const item of newsItems.slice(0, 3)) {
+      const title = (item.title || "").trim();
+      if (!title || existingTitles.has(title)) continue;
+
+      const props = {
+        "新聞標題": { title: [{ text: { content: title.slice(0, 180) } }] },
+        "媒體來源": { rich_text: [{ text: { content: (item.source || "焦點快訊").slice(0, 80) } }] },
+        "產出日期": { rich_text: [{ text: { content: item.pubDate || todayStr } }] },
+        "AI重點摘要": { rich_text: [{ text: { content: (item.summary || "").slice(0, 1800) } }] },
+        "產業落地影響": { rich_text: [{ text: { content: (item.impact || "").slice(0, 1800) } }] },
+        "原文連結": { url: item.link || "https://news.google.com" }
+      };
+      if (userPageId) {
+        props["所屬用戶"] = { relation: [{ id: userPageId }] };
+      }
+
+      const wRes = await fetch("https://api.notion.com/v1/pages", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ parent: { database_id: newsDbId }, properties: props })
+      });
+      if (wRes.ok) {
+        inserted++;
+        existingTitles.add(title);
+      }
+    }
+
+    return { ok: true, inserted };
+  } catch (e) {
+    return { ok: false, reason: String(e), inserted: 0 };
+  }
+}
+
+async function syncKeywordsToNotion(userId, keywords, env) {
+  const res = await upsertUserToNotion(userId, "", keywords, env);
+  return res.ok;
 }
 
 /**

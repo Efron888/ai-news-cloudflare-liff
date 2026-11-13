@@ -28,6 +28,18 @@ export default {
       }
     }
 
+    // 1.5 提供前端公開組態 (LIFF_ID 與 Notion 連線狀態)
+    if (url.pathname === '/api/config') {
+      return new Response(
+        JSON.stringify({
+          liffId: env.LIFF_ID || '',
+          notionConfigured: Boolean(env.NOTION_API_KEY),
+          lineTokenConfigured: Boolean(env.LINE_CHANNEL_ACCESS_TOKEN)
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+      );
+    }
+
     // 2. LINE Messaging API Webhook 與 Cloudflare 免費 AI 問答 / 新聞直連 API
     if (url.pathname === '/api/webhook' || url.pathname === '/webhook') {
       if (request.method === 'OPTIONS') {

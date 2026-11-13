@@ -190,6 +190,26 @@
         </div>
       </div>
 
+      <div class="pt-2 border-t border-slate-100 space-y-2">
+        <div class="flex items-center justify-between">
+          <label class="block text-xs font-bold text-slate-700 flex items-center gap-1.5">
+            <i data-lucide="user-check" class="w-4 h-4 text-emerald-600"></i>
+            <span>LINE 身分 & Notion 同步設定</span>
+          </label>
+          <span id="notion-sync-badge" class="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 font-semibold">檢查 Notion...</span>
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-[10px] text-slate-500 mb-1">LINE / 自訂名稱</label>
+            <input type="text" id="custom-display-name" class="w-full text-xs p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="LINE 登入自動帶入">
+          </div>
+          <div>
+            <label class="block text-[10px] text-slate-500 mb-1">LINE LIFF ID (選填)</label>
+            <input type="text" id="custom-liff-id" class="w-full text-xs p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="例: 2001234567-xxxx">
+          </div>
+        </div>
+      </div>
+
       <div class="pt-2 flex flex-col space-y-2">
         <button id="save-and-refresh-btn" class="w-full bg-[#0F3B82] hover:bg-blue-700 text-white font-bold py-3 rounded-xl shadow-md transition flex items-center justify-center space-x-2 text-sm">
           <i data-lucide="zap" class="w-4 h-4 fill-white"></i>
@@ -337,6 +357,17 @@
           const parsed = JSON.parse(saved);
           if (parsed.keywords) currentUser.keywords = parsed.keywords;
           if (parsed.pushTime) currentUser.pushTime = parsed.pushTime;
+          if (parsed.displayName && parsed.displayName !== "訪客 (預覽模式)") {
+            currentUser.displayName = parsed.displayName;
+          }
+          if (parsed.liffId) APP_CONFIG.LIFF_ID = parsed.liffId;
+        }
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get("liffId")) {
+          APP_CONFIG.LIFF_ID = urlParams.get("liffId").trim();
+        }
+        if (urlParams.get("name")) {
+          currentUser.displayName = urlParams.get("name").trim();
         }
       } catch (e) {}
       updateUIBadgeSettings();
@@ -346,7 +377,9 @@
       try {
         localStorage.setItem("ai_news_user_settings", JSON.stringify({
           keywords: currentUser.keywords,
-          pushTime: currentUser.pushTime
+          pushTime: currentUser.pushTime,
+          displayName: currentUser.displayName,
+          liffId: APP_CONFIG.LIFF_ID
         }));
       } catch (e) {}
       updateUIBadgeSettings();
@@ -355,6 +388,11 @@
     function updateUIBadgeSettings() {
       document.getElementById('display-push-time').innerText = currentUser.pushTime || "08:00";
       document.getElementById('custom-push-time').value = currentUser.pushTime || "08:00";
+      const nameInput = document.getElementById('custom-display-name');
+      if (nameInput) nameInput.value = currentUser.displayName === "訪客 (預覽模式)" ? "" : currentUser.displayName;
+      const liffInput = document.getElementById('custom-liff-id');
+      if (liffInput) liffInput.value = APP_CONFIG.LIFF_ID || "";
+      document.getElementById('user-name').innerText = currentUser.displayName;
       renderKeywordsTags(currentUser.keywords);
     }
 
@@ -371,6 +409,27 @@
     }
 
     async function initLineLiff() {
+      // 從後端讀取雲端公開組態 (LIFF_ID & Notion 連線狀態)
+      try {
+        const cfgRes = await fetch("/api/config");
+        if (cfgRes.ok) {
+          const cfg = await cfgRes.json();
+          if (cfg.liffId && !APP_CONFIG.LIFF_ID) {
+            APP_CONFIG.LIFF_ID = cfg.liffId;
+          }
+          const badge = document.getElementById('notion-sync-badge');
+          if (badge) {
+            if (cfg.notionConfigured) {
+              badge.className = "text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-bold";
+              badge.innerText = "✅ Notion 已連線";
+            } else {
+              badge.className = "text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-bold";
+              badge.innerText = "⚠️ 缺 NOTION_API_KEY";
+            }
+          }
+        }
+      } catch (e) {}
+
       if (APP_CONFIG.LIFF_ID) {
         try {
           await liff.init({ liffId: APP_CONFIG.LIFF_ID });
@@ -379,6 +438,7 @@
             currentUser.userId = profile.userId;
             currentUser.displayName = profile.displayName;
             currentUser.pictureUrl = profile.pictureUrl || currentUser.pictureUrl;
+            document.getElementById('user-badge').innerText = "LINE 已連動";
           } else {
             liff.login();
             return;
@@ -389,6 +449,20 @@
       }
       document.getElementById('user-name').innerText = currentUser.displayName;
       document.getElementById('user-avatar').src = currentUser.pictureUrl;
+      updateUIBadgeSettings();
+
+      // 同步用戶名稱與關鍵字至 Notion「AI新聞_用戶設定」
+      fetch(APP_CONFIG.WEBHOOK_API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "syncUser",
+          userId: currentUser.userId,
+          displayName: currentUser.displayName,
+          keywords: currentUser.keywords
+        })
+      }).catch(() => {});
+
       await fetchUserDataAndNews();
     }
 
@@ -418,6 +492,17 @@
         const liveNews = await fetchLiveGoogleNewsRSS(currentUser.keywords, forceFresh);
         if (liveNews && liveNews.length > 0) {
           renderNewsCards(liveNews);
+          // 背景同步最新新聞至 Notion「AI新聞_今日產出」資料庫 (不重複寫入)
+          fetch(APP_CONFIG.WEBHOOK_API_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              action: "syncNews",
+              userId: currentUser.userId,
+              displayName: currentUser.displayName,
+              items: liveNews
+            })
+          }).catch(() => {});
         } else if (!renderedFromCache) {
           renderNewsCards(getMockNewsData());
         }
@@ -674,6 +759,10 @@
         if (isFromModal) {
           currentUser.keywords = customKeywordsInput.value.trim() || APP_CONFIG.DEFAULT_KEYWORDS;
           currentUser.pushTime = customTimeInput.value || "08:00";
+          const nameVal = document.getElementById('custom-display-name')?.value.trim();
+          if (nameVal) currentUser.displayName = nameVal;
+          const liffVal = document.getElementById('custom-liff-id')?.value.trim();
+          if (liffVal) APP_CONFIG.LIFF_ID = liffVal;
           saveSettingsLocally();
           localStorage.removeItem("ai_news_last_scheduled_run");
           settingsModal.classList.add('hidden');
@@ -687,6 +776,7 @@
           body: JSON.stringify({
             action: "updateKeywords",
             userId: currentUser.userId,
+            displayName: currentUser.displayName,
             keywords: currentUser.keywords
           })
         }).catch(() => {});
@@ -712,6 +802,10 @@
       saveSettingsOnlyBtn.addEventListener('click', () => {
         currentUser.keywords = customKeywordsInput.value.trim() || APP_CONFIG.DEFAULT_KEYWORDS;
         currentUser.pushTime = customTimeInput.value || "08:00";
+        const nameVal = document.getElementById('custom-display-name')?.value.trim();
+        if (nameVal) currentUser.displayName = nameVal;
+        const liffVal = document.getElementById('custom-liff-id')?.value.trim();
+        if (liffVal) APP_CONFIG.LIFF_ID = liffVal;
         saveSettingsLocally();
         localStorage.removeItem("ai_news_last_scheduled_run");
         settingsModal.classList.add('hidden');
@@ -722,6 +816,7 @@
           body: JSON.stringify({
             action: "updateKeywords",
             userId: currentUser.userId,
+            displayName: currentUser.displayName,
             keywords: currentUser.keywords
           })
         }).catch(() => {});
