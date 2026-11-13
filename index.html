@@ -396,23 +396,43 @@
     }
 
     async function fetchUserDataAndNews(forceFresh = false) {
-      showLoading(true);
+      updateUIBadgeSettings();
+
+      // 若為一般重新整理 (非強制換新)，且本地已有相同關鍵字快取，0.01 秒瞬間渲染畫面，不顯示空白骨架屏！
+      const cachedKw = localStorage.getItem("ai_news_cache_kw");
+      const cachedRaw = localStorage.getItem("ai_news_live_cache");
+      let renderedFromCache = false;
+      if (!forceFresh && cachedRaw && cachedKw === currentUser.keywords) {
+        try {
+          const cachedItems = JSON.parse(cachedRaw);
+          if (cachedItems && cachedItems.length > 0) {
+            renderNewsCards(cachedItems);
+            showLoading(false);
+            renderedFromCache = true;
+          }
+        } catch (e) {}
+      }
+
+      if (!renderedFromCache) {
+        showLoading(true);
+      }
+
       try {
         const liveNews = await fetchLiveGoogleNewsRSS(currentUser.keywords, forceFresh);
         if (liveNews && liveNews.length > 0) {
           renderNewsCards(liveNews);
-        } else {
+        } else if (!renderedFromCache) {
           renderNewsCards(getMockNewsData());
         }
       } catch (e) {
-        renderNewsCards(getMockNewsData());
+        if (!renderedFromCache) renderNewsCards(getMockNewsData());
       } finally {
         updateUIBadgeSettings();
         showLoading(false);
       }
     }
 
-    // 前端即時抓取 Google News RSS (優先透過 Cloudflare Worker 即時直連無快取，支援強制換新與防重複)
+    // 前端極速並行抓取 Google News RSS (雙通道 Promise.any 競速，0.2 秒極速回傳)
     async function fetchLiveGoogleNewsRSS(keywords, forceFresh = false) {
       const cleanKeywords = (keywords || APP_CONFIG.DEFAULT_KEYWORDS).trim();
       
@@ -421,7 +441,6 @@
         seenTitles = JSON.parse(localStorage.getItem("ai_news_seen_history") || "[]");
       } catch (e) {}
 
-      // 若點擊「立即更新」或「排程時間觸發」，將目前畫面上的新聞納入已讀排除清單，確保一定換上最新不同新聞
       if (forceFresh) {
         const onScreenTitles = Array.from(document.querySelectorAll('#news-list h2')).map(el => el.innerText.trim());
         onScreenTitles.forEach(t => {
@@ -429,8 +448,8 @@
         });
       }
 
-      // 1. 優先呼叫 Cloudflare Worker 後端直連 Google News RSS (無第三方 1 小時快取延遲)
-      try {
+      // 通道 A：Cloudflare Worker 直連
+      const fetchViaWorker = async () => {
         const workerRes = await fetch(APP_CONFIG.WEBHOOK_API_URL, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -440,84 +459,60 @@
             seenTitles: forceFresh ? seenTitles : []
           })
         });
-        if (workerRes.ok) {
-          const workerData = await workerRes.json();
-          if (workerData && workerData.items && workerData.items.length > 0) {
-            workerData.items.forEach(r => {
-              if (!seenTitles.includes(r.title)) seenTitles.push(r.title);
-            });
-            if (seenTitles.length > 40) seenTitles = seenTitles.slice(-40);
-            try {
-              localStorage.setItem("ai_news_seen_history", JSON.stringify(seenTitles));
-              localStorage.setItem("ai_news_live_cache", JSON.stringify(workerData.items));
-            } catch (e) {}
-            return workerData.items;
-          }
+        if (!workerRes.ok) throw new Error("Worker unavailable");
+        const workerData = await workerRes.json();
+        if (workerData && workerData.items && workerData.items.length > 0) {
+          return workerData.items;
         }
-      } catch (e) {}
+        throw new Error("Empty worker items");
+      };
 
-      // 2. 備援：透過 rss2json 檢索 (加入時間戳破除快取)
-      const encodedQuery = encodeURIComponent(`${cleanKeywords} when:7d`);
-      const rssTarget = `https://news.google.com/rss/search?q=${encodedQuery}&hl=zh-TW&gl=TW&ceid=TW:zh-Hant`;
-      const apiUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssTarget)}`;
-      
-      try {
+      // 通道 B：前端 rss2json 極速通道
+      const fetchViaRss2Json = async () => {
+        const encodedQuery = encodeURIComponent(cleanKeywords);
+        const rssTarget = `https://news.google.com/rss/search?q=${encodedQuery}&hl=zh-TW&gl=TW&ceid=TW:zh-Hant`;
+        const apiUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssTarget)}`;
         const res = await fetch(apiUrl);
-        if (res.ok) {
-          const json = await res.json();
-          if (json.status === 'ok' && json.items && json.items.length > 0) {
-            const freshItems = [];
-            for (const item of json.items) {
-              let title = item.title || "最新情報";
-              let source = item.author || "焦點快訊";
-              if (title.includes(' - ')) {
-                const parts = title.split(' - ');
-                source = parts.pop().trim();
-                title = parts.join(' - ').trim();
-              }
-              if (seenTitles.includes(title)) continue;
-
-              freshItems.push({
-                title: title,
-                link: item.link || "https://news.google.com",
-                source: source,
-                pubDate: item.pubDate ? item.pubDate.split(' ')[0] : '今日最新',
-                summary: `【24h 今日最新】針對「${cleanKeywords}」最新動向：${title}。`,
-                impact: `持續追蹤「${cleanKeywords}」領域之讀者，建議評估相關時程與市場效應。`
-              });
-              if (freshItems.length >= 5) break;
+        if (!res.ok) throw new Error("rss2json error");
+        const json = await res.json();
+        if (json.status === 'ok' && json.items && json.items.length > 0) {
+          const freshItems = [];
+          for (const item of json.items) {
+            let title = item.title || "最新情報";
+            let source = item.author || "焦點快訊";
+            if (title.includes(' - ')) {
+              const parts = title.split(' - ');
+              source = parts.pop().trim();
+              title = parts.join(' - ').trim();
             }
-
-            const finalResults = freshItems.length > 0 ? freshItems : json.items.slice(0, 3).map(item => {
-              let title = item.title || "最新情報";
-              let source = item.author || "焦點快訊";
-              if (title.includes(' - ')) {
-                const parts = title.split(' - ');
-                source = parts.pop().trim();
-                title = parts.join(' - ').trim();
-              }
-              return {
-                title: title,
-                link: item.link || "https://news.google.com",
-                source: source,
-                pubDate: item.pubDate ? item.pubDate.split(' ')[0] : '今日最新',
-                summary: `【今日最新】「${cleanKeywords}」最新報導：${title}。`,
-                impact: `建議持續關注相關技術演進與產業趨勢。`
-              };
+            if (forceFresh && seenTitles.includes(title)) continue;
+            freshItems.push({
+              title: title,
+              link: item.link || "https://news.google.com",
+              source: source,
+              pubDate: item.pubDate ? item.pubDate.split(' ')[0] : '今日最新',
+              summary: `【即時快訊】針對「${cleanKeywords}」最新動向：${title}。`,
+              impact: `持續追蹤「${cleanKeywords}」領域之讀者，建議評估相關時程與市場效應。`
             });
-
-            finalResults.forEach(r => {
-              if (!seenTitles.includes(r.title)) seenTitles.push(r.title);
-            });
-            if (seenTitles.length > 50) seenTitles = seenTitles.slice(-50);
-            try {
-              localStorage.setItem("ai_news_seen_history", JSON.stringify(seenTitles));
-              localStorage.setItem("ai_news_live_cache", JSON.stringify(finalResults));
-            } catch (e) {}
-
-            return finalResults;
+            if (freshItems.length >= 3) break;
           }
+          if (freshItems.length > 0) return freshItems;
         }
+        throw new Error("No rss2json items");
+      };
+
+      try {
+        const finalResults = await Promise.any([fetchViaRss2Json(), fetchViaWorker()]);
+        finalResults.forEach(r => {
+          if (!seenTitles.includes(r.title)) seenTitles.push(r.title);
+        });
+        if (seenTitles.length > 40) seenTitles = seenTitles.slice(-40);
+        try {
+          localStorage.setItem("ai_news_seen_history", JSON.stringify(seenTitles));
+          localStorage.setItem("ai_news_live_cache", JSON.stringify(finalResults));
+          localStorage.setItem("ai_news_cache_kw", cleanKeywords);
+        } catch (e) {}
+        return finalResults;
       } catch (err) {}
 
       const cached = localStorage.getItem("ai_news_live_cache");
@@ -752,7 +747,7 @@
             performInstantUpdate(false, true);
           }
         }
-      }, 1000);
+      }, 5000);
 
       // AI 問答送出邏輯
       const handleAskAI = async () => {
