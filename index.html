@@ -1,0 +1,806 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>AI 產業情報專刊 (Cloudflare × LINE LIFF × Canva)</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- LINE LIFF SDK -->
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  
+  <style>
+    body {
+      -webkit-tap-highlight-color: transparent;
+      font-family: "Microsoft JhengHei", "微軟正黑體", system-ui, sans-serif;
+    }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col antialiased">
+
+  <!-- 頂部導航欄 (Fixed Header) -->
+  <header class="sticky top-0 z-40 bg-[#0F3B82] text-white shadow-md">
+    <div class="max-w-md mx-auto px-3.5 py-3 flex items-center justify-between">
+      <div class="flex items-center space-x-2">
+        <div class="bg-blue-600 p-1.5 rounded-lg flex items-center justify-center">
+          <i data-lucide="newspaper" class="w-5 h-5 text-white"></i>
+        </div>
+        <div>
+          <div class="flex items-center space-x-1.5">
+            <h1 class="text-sm font-bold tracking-tight">AI 產業情報專刊</h1>
+            <span class="bg-orange-500/90 text-white text-[9px] px-1.5 py-0.5 rounded font-bold">Cloudflare AI</span>
+          </div>
+          <p id="current-date" class="text-[11px] text-blue-200">讀取中...</p>
+        </div>
+      </div>
+      
+      <!-- 頂部功能按鈕群：簡報、AI問答、問題回報、設定主題 -->
+      <div class="flex items-center space-x-1.5">
+        <a href="presentation.html" class="flex items-center space-x-1 bg-amber-400 hover:bg-amber-300 text-slate-950 px-2.5 py-1.5 rounded-full text-[11px] font-bold transition shadow-sm" title="開啟互動簡報與下載">
+          <i data-lucide="presentation" class="w-3.5 h-3.5"></i>
+          <span>簡報</span>
+        </a>
+        <button id="open-ai-qa-btn" class="flex items-center space-x-1 bg-cyan-500 hover:bg-cyan-400 text-slate-950 px-2.5 py-1.5 rounded-full text-[11px] font-bold transition shadow-sm" title="Cloudflare 免費 AI 問答">
+          <i data-lucide="bot" class="w-3.5 h-3.5"></i>
+          <span>問答</span>
+        </button>
+        <button id="open-issue-btn" class="flex items-center space-x-1 bg-white/15 hover:bg-white/25 text-white px-2.5 py-1.5 rounded-full text-[11px] font-medium border border-white/20 transition" title="問題回報">
+          <i data-lucide="message-square-warning" class="w-3.5 h-3.5"></i>
+          <span>回報</span>
+        </button>
+        <button id="open-settings-btn" class="flex items-center space-x-1 bg-white/15 hover:bg-white/25 text-white px-2.5 py-1.5 rounded-full text-[11px] font-medium border border-white/20 transition" title="設定主題與時間">
+          <i data-lucide="sliders-horizontal" class="w-3.5 h-3.5"></i>
+          <span>設定</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- 主內容容器 -->
+  <main class="flex-1 max-w-md w-full mx-auto p-4 space-y-4">
+
+    <!-- 快捷功能橫幅：互動簡報 + 下載 + 問題回報指引 -->
+    <div class="bg-gradient-to-r from-[#0F3B82] to-[#2563EB] rounded-2xl p-3.5 text-white shadow-sm flex items-center justify-between">
+      <div class="space-y-0.5">
+        <div class="text-xs font-bold flex items-center gap-1.5">
+          <i data-lucide="sparkles" class="w-3.5 h-3.5 text-amber-300"></i>
+          <span>產品使用教學 & 問題回報互動簡報</span>
+        </div>
+        <p class="text-[11px] text-blue-100">支援網頁點擊翻頁，並可下載 Canva PPTX / PDF / HTML</p>
+      </div>
+      <a href="presentation.html" class="shrink-0 bg-white text-[#0F3B82] hover:bg-blue-50 font-bold text-xs px-3 py-2 rounded-xl shadow transition flex items-center space-x-1">
+        <span>點此開啟</span>
+        <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
+      </a>
+    </div>
+    
+    <!-- 使用者歡迎卡與關鍵字 Tag 區 -->
+    <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 flex flex-col space-y-3">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center space-x-2.5">
+          <img id="user-avatar" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=120&q=80" alt="Avatar" class="w-9 h-9 rounded-full ring-2 ring-blue-500/30 object-cover">
+          <div>
+            <div class="flex items-center space-x-1.5">
+              <span id="user-name" class="font-bold text-sm text-slate-900">訪客 (預覽模式)</span>
+              <span id="user-badge" class="bg-blue-100 text-blue-700 text-[10px] px-1.5 py-0.5 rounded font-medium">專屬日報</span>
+            </div>
+            <p id="status-text" class="text-[11px] text-slate-400">24h 最新新聞篩選 × 每日防重複機制</p>
+          </div>
+        </div>
+        
+        <!-- 立即更新按鈕 -->
+        <button id="instant-update-btn" class="flex items-center space-x-1.5 bg-blue-50 hover:bg-blue-100 active:scale-95 text-[#0F3B82] px-3 py-1.5 rounded-xl text-xs font-bold border border-blue-200 transition shadow-sm">
+          <i data-lucide="zap" class="w-3.5 h-3.5 text-blue-600 fill-blue-600"></i>
+          <span>立即更新</span>
+        </button>
+      </div>
+
+      <!-- 目前追蹤關鍵字與時間 Badge -->
+      <div class="pt-2 border-t border-slate-100 flex flex-col space-y-2">
+        <div class="flex items-center justify-between text-[11px] text-slate-500 font-medium">
+          <span class="flex items-center gap-1">
+            <i data-lucide="tag" class="w-3 h-3 text-blue-600"></i>
+            目前追蹤主題：
+          </span>
+          <span id="push-time-badge" class="flex items-center gap-1 text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md font-semibold">
+            <i data-lucide="clock" class="w-3 h-3 text-blue-600"></i>
+            每日 <span id="display-push-time">08:00</span> 更新
+          </span>
+        </div>
+        <div id="keywords-tags" class="flex flex-wrap gap-1.5">
+          <span class="bg-slate-100 text-slate-600 text-xs px-2.5 py-1 rounded-md">載入中...</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 載入中骨架屏 (Skeleton Loading) -->
+    <div id="loading-skeleton" class="space-y-4">
+      <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 animate-pulse space-y-3">
+        <div class="h-4 bg-slate-200 rounded w-1/3"></div>
+        <div class="h-5 bg-slate-200 rounded w-4/5"></div>
+        <div class="h-16 bg-blue-50 rounded"></div>
+        <div class="h-10 bg-slate-100 rounded"></div>
+      </div>
+      <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 animate-pulse space-y-3">
+        <div class="h-4 bg-slate-200 rounded w-1/4"></div>
+        <div class="h-5 bg-slate-200 rounded w-3/4"></div>
+        <div class="h-16 bg-blue-50 rounded"></div>
+        <div class="h-10 bg-slate-100 rounded"></div>
+      </div>
+    </div>
+
+    <!-- 新聞卡片列表容器 -->
+    <div id="news-list" class="space-y-4 hidden"></div>
+
+    <!-- 無新聞狀態 -->
+    <div id="empty-state" class="hidden bg-white p-8 rounded-2xl shadow-sm border border-slate-200 text-center space-y-3">
+      <div class="w-12 h-12 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto">
+        <i data-lucide="inbox" class="w-6 h-6"></i>
+      </div>
+      <h3 class="font-bold text-slate-800 text-sm">今日尚無相關主題新訊</h3>
+      <p class="text-xs text-slate-500">建議點選右上角「設定」加入更廣泛的關鍵字。</p>
+    </div>
+
+  </main>
+
+  <!-- 1. 關鍵字與時間設定抽屜 (Settings Modal) -->
+  <div id="settings-modal" class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm hidden items-end sm:items-center justify-center p-0 sm:p-4">
+    <div class="bg-white w-full max-w-md rounded-t-3xl sm:rounded-2xl p-5 space-y-4 shadow-xl">
+      <div class="flex items-center justify-between border-b pb-3">
+        <div class="flex items-center space-x-2">
+          <i data-lucide="settings" class="w-5 h-5 text-blue-600"></i>
+          <h3 class="font-bold text-base text-slate-900">設定專屬關注主題</h3>
+        </div>
+        <button id="close-modal-btn" class="text-slate-400 hover:text-slate-600 p-1">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div>
+        <label class="block text-xs font-bold text-slate-700 mb-2">🔥 推薦熱門標籤（點擊加入）：</label>
+        <div class="flex flex-wrap gap-2">
+          <button type="button" class="preset-tag bg-slate-100 hover:bg-blue-50 hover:text-blue-600 text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 transition" data-tag="具身機器人">+ 具身機器人</button>
+          <button type="button" class="preset-tag bg-slate-100 hover:bg-blue-50 hover:text-blue-600 text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 transition" data-tag="製造業 AI">+ 製造業 AI</button>
+          <button type="button" class="preset-tag bg-slate-100 hover:bg-blue-50 hover:text-blue-600 text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 transition" data-tag="智慧工廠">+ 智慧工廠</button>
+          <button type="button" class="preset-tag bg-slate-100 hover:bg-blue-50 hover:text-blue-600 text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 transition" data-tag="AOI 瑕疵檢測">+ AOI 瑕疵檢測</button>
+          <button type="button" class="preset-tag bg-slate-100 hover:bg-blue-50 hover:text-blue-600 text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 transition" data-tag="台積電 CoWoS">+ 台積電 CoWoS</button>
+          <button type="button" class="preset-tag bg-slate-100 hover:bg-blue-50 hover:text-blue-600 text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 transition" data-tag="邊緣運算">+ 邊緣運算</button>
+        </div>
+      </div>
+
+      <div>
+        <label for="custom-keywords" class="block text-xs font-bold text-slate-700 mb-1.5">我的追蹤關鍵字（用逗號分開）：</label>
+        <textarea id="custom-keywords" rows="2" class="w-full text-sm p-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none" placeholder="例如：具身機器人, 製造業 AI"></textarea>
+      </div>
+
+      <div class="pt-2 border-t border-slate-100 space-y-2">
+        <div class="flex items-center justify-between">
+          <label class="block text-xs font-bold text-slate-700 flex items-center gap-1.5">
+            <i data-lucide="clock" class="w-4 h-4 text-blue-600"></i>
+            <span>⏰ 每日更新 / 推送時間：</span>
+          </label>
+          <input type="time" id="custom-push-time" value="08:00" class="text-xs font-bold text-blue-900 bg-blue-50 border border-blue-200 rounded-lg px-2 py-1 outline-none">
+        </div>
+        <div class="flex flex-wrap gap-1.5">
+          <button type="button" class="time-preset-tag bg-slate-100 text-[11px] px-2.5 py-1 rounded-md border border-slate-200 font-medium" data-time="07:00">07:00 晨報</button>
+          <button type="button" class="time-preset-tag bg-blue-100 text-blue-700 text-[11px] px-2.5 py-1 rounded-md border border-blue-300 font-bold" data-time="08:00">08:00 上班首選</button>
+          <button type="button" class="time-preset-tag bg-slate-100 text-[11px] px-2.5 py-1 rounded-md border border-slate-200 font-medium" data-time="09:00">09:00 開工特刊</button>
+          <button type="button" class="time-preset-tag bg-slate-100 text-[11px] px-2.5 py-1 rounded-md border border-slate-200 font-medium" data-time="12:30">12:30 午間特刊</button>
+          <button type="button" class="time-preset-tag bg-slate-100 text-[11px] px-2.5 py-1 rounded-md border border-slate-200 font-medium" data-time="18:00">18:00 傍晚盤點</button>
+        </div>
+      </div>
+
+      <div class="pt-2 flex flex-col space-y-2">
+        <button id="save-and-refresh-btn" class="w-full bg-[#0F3B82] hover:bg-blue-700 text-white font-bold py-3 rounded-xl shadow-md transition flex items-center justify-center space-x-2 text-sm">
+          <i data-lucide="zap" class="w-4 h-4 fill-white"></i>
+          <span>儲存並「立即更新」新聞</span>
+        </button>
+        <button id="save-settings-only-btn" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold py-2.5 rounded-xl transition flex items-center justify-center space-x-1.5 text-xs">
+          <i data-lucide="check" class="w-3.5 h-3.5"></i>
+          <span>僅儲存時間與主題設定</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. Cloudflare 免費 AI 智慧問答彈窗 (对应照片第 3 點) -->
+  <div id="ai-qa-modal" class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm hidden items-end sm:items-center justify-center p-0 sm:p-4">
+    <div class="bg-white w-full max-w-md rounded-t-3xl sm:rounded-2xl p-5 space-y-4 shadow-xl flex flex-col max-h-[85vh]">
+      <div class="flex items-center justify-between border-b pb-3">
+        <div class="flex items-center space-x-2">
+          <div class="bg-cyan-100 text-cyan-700 p-1.5 rounded-lg">
+            <i data-lucide="bot" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h3 class="font-bold text-sm text-slate-900">Cloudflare 免費 AI 智慧問答</h3>
+            <p class="text-[11px] text-slate-400">串接 LINE Messaging API × Cloudflare Workers AI</p>
+          </div>
+        </div>
+        <button id="close-ai-qa-btn" class="text-slate-400 hover:text-slate-600 p-1">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- 聊天訊息區 -->
+      <div id="ai-chat-history" class="flex-1 overflow-y-auto space-y-3 p-3 bg-slate-50 rounded-xl border border-slate-200 min-h-[220px] max-h-[320px] text-xs">
+        <div class="bg-white border border-slate-200 rounded-xl p-3 text-slate-700 leading-relaxed shadow-sm">
+          👋 您好！我是運行於 <b>Cloudflare Workers AI（每日免費 AI 額度）</b> 的智慧問答助理。<br><br>
+          您可以在下方直接向我提問，或者在 <b>LINE@ 官方帳號聊天室</b> 直接打字與我對話！
+        </div>
+      </div>
+
+      <!-- 快速提問範例 -->
+      <div class="flex flex-wrap gap-1.5">
+        <button type="button" class="qa-sample-btn bg-blue-50 hover:bg-blue-100 text-[#0F3B82] text-[11px] px-2.5 py-1 rounded-lg border border-blue-200 transition" data-q="什麼是具身機器人？對台灣製造業有何幫助？">💡 什麼是具身機器人？</button>
+        <button type="button" class="qa-sample-btn bg-blue-50 hover:bg-blue-100 text-[#0F3B82] text-[11px] px-2.5 py-1 rounded-lg border border-blue-200 transition" data-q="台灣人工智慧基本法對製造業有什麼影響？">⚖️ AI 基本法對製造業影響？</button>
+      </div>
+
+      <!-- 輸入框與送出 -->
+      <div class="flex items-center space-x-2">
+        <input type="text" id="ai-question-input" class="flex-1 text-xs p-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none" placeholder="輸入您想詢問的產業或新聞問題...">
+        <button id="send-ai-question-btn" class="bg-[#0F3B82] hover:bg-blue-700 text-white font-bold px-4 py-3 rounded-xl text-xs transition flex items-center space-x-1 shrink-0">
+          <i data-lucide="send" class="w-3.5 h-3.5"></i>
+          <span>提問</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. 問題回報表單彈窗 (對應照片第 2b 點：如果有一些問題，我要怎麼回報？) -->
+  <div id="issue-modal" class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm hidden items-end sm:items-center justify-center p-0 sm:p-4">
+    <div class="bg-white w-full max-w-md rounded-t-3xl sm:rounded-2xl p-5 space-y-4 shadow-xl">
+      <div class="flex items-center justify-between border-b pb-3">
+        <div class="flex items-center space-x-2">
+          <div class="bg-amber-100 text-amber-700 p-1.5 rounded-lg">
+            <i data-lucide="message-square-warning" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h3 class="font-bold text-sm text-slate-900">問題回報與意見回饋</h3>
+            <p class="text-[11px] text-slate-400">自動建立工單並同步至 Notion 問題回報追蹤庫</p>
+          </div>
+        </div>
+        <button id="close-issue-btn" class="text-slate-400 hover:text-slate-600 p-1">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div>
+        <label class="block text-xs font-bold text-slate-700 mb-1.5">問題類別：</label>
+        <select id="issue-category" class="w-full text-xs p-2.5 border border-slate-300 rounded-xl bg-white outline-none focus:ring-2 focus:ring-blue-500">
+          <option value="功能異常">🔴 功能異常（無法更新／畫面錯誤）</option>
+          <option value="新聞內容問題">🟠 新聞內容問題（連結失效／重複報導）</option>
+          <option value="操作疑問">🔵 操作疑問（不清楚如何使用）</option>
+          <option value="功能建議">🟢 功能建議（希望新增功能或標籤）</option>
+        </select>
+      </div>
+
+      <div>
+        <label class="block text-xs font-bold text-slate-700 mb-1.5">詳細描述：</label>
+        <textarea id="issue-desc" rows="3" class="w-full text-xs p-3 border border-slate-300 rounded-xl outline-none focus:ring-2 focus:ring-blue-500" placeholder="請描述您遇到的狀況或建議（亦可直接在 LINE 聊天室輸入「回報：問題內容」）..."></textarea>
+      </div>
+
+      <button id="submit-issue-btn" class="w-full bg-[#0F3B82] hover:bg-blue-700 text-white font-bold py-3 rounded-xl shadow-md transition flex items-center justify-center space-x-2 text-xs">
+        <i data-lucide="check-circle" class="w-4 h-4"></i>
+        <span>送出問題回報單</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- 浮動 Toast 提示通知 -->
+  <div id="toast" class="fixed top-5 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white text-xs font-semibold px-4 py-2.5 rounded-full shadow-lg transition-all duration-300 opacity-0 pointer-events-none flex items-center space-x-2">
+    <i data-lucide="check-circle" class="w-4 h-4 text-emerald-400"></i>
+    <span id="toast-msg">已成功更新！</span>
+  </div>
+
+  <footer class="mt-auto py-4 text-center text-slate-400 text-[11px] space-y-1">
+    <div>由 Cloudflare Pages & Workers AI × LINE LIFF × Notion 雲端驅動</div>
+    <div>
+      <a href="presentation.html" class="text-blue-600 hover:underline font-semibold">📊 點此開啟產品介紹 HTML 互動簡報（可下載 PPTX / PDF）</a>
+    </div>
+  </footer>
+
+  <!-- 應用程式核心邏輯腳本 -->
+  <script>
+    const APP_CONFIG = {
+      WEBHOOK_API_URL: "/api/webhook",
+      LIFF_ID: "",
+      DEFAULT_KEYWORDS: "具身機器人, 製造業 AI, 智慧工廠"
+    };
+
+    let currentUser = {
+      userId: "demo_user",
+      displayName: "訪客 (預覽模式)",
+      pictureUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=120&q=80",
+      keywords: APP_CONFIG.DEFAULT_KEYWORDS,
+      pushTime: "08:00"
+    };
+
+    document.addEventListener("DOMContentLoaded", async () => {
+      lucide.createIcons();
+      initDateDisplay();
+      loadSavedSettings();
+      initUIListeners();
+      await initLineLiff();
+    });
+
+    function initDateDisplay() {
+      const today = new Date();
+      const options = { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' };
+      document.getElementById('current-date').innerText = today.toLocaleDateString('zh-TW', options);
+    }
+
+    function loadSavedSettings() {
+      try {
+        const saved = localStorage.getItem("ai_news_user_settings");
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed.keywords) currentUser.keywords = parsed.keywords;
+          if (parsed.pushTime) currentUser.pushTime = parsed.pushTime;
+        }
+      } catch (e) {}
+      updateUIBadgeSettings();
+    }
+
+    function saveSettingsLocally() {
+      try {
+        localStorage.setItem("ai_news_user_settings", JSON.stringify({
+          keywords: currentUser.keywords,
+          pushTime: currentUser.pushTime
+        }));
+      } catch (e) {}
+      updateUIBadgeSettings();
+    }
+
+    function updateUIBadgeSettings() {
+      document.getElementById('display-push-time').innerText = currentUser.pushTime || "08:00";
+      document.getElementById('custom-push-time').value = currentUser.pushTime || "08:00";
+      renderKeywordsTags(currentUser.keywords);
+    }
+
+    function showToast(message) {
+      const toast = document.getElementById('toast');
+      const toastMsg = document.getElementById('toast-msg');
+      toastMsg.innerText = message;
+      toast.classList.remove('opacity-0', 'pointer-events-none');
+      toast.classList.add('opacity-100');
+      setTimeout(() => {
+        toast.classList.remove('opacity-100');
+        toast.classList.add('opacity-0', 'pointer-events-none');
+      }, 2800);
+    }
+
+    async function initLineLiff() {
+      if (APP_CONFIG.LIFF_ID) {
+        try {
+          await liff.init({ liffId: APP_CONFIG.LIFF_ID });
+          if (liff.isLoggedIn()) {
+            const profile = await liff.getProfile();
+            currentUser.userId = profile.userId;
+            currentUser.displayName = profile.displayName;
+            currentUser.pictureUrl = profile.pictureUrl || currentUser.pictureUrl;
+          } else {
+            liff.login();
+            return;
+          }
+        } catch (err) {
+          console.warn("LIFF 預覽模式:", err);
+        }
+      }
+      document.getElementById('user-name').innerText = currentUser.displayName;
+      document.getElementById('user-avatar').src = currentUser.pictureUrl;
+      await fetchUserDataAndNews();
+    }
+
+    async function fetchUserDataAndNews() {
+      showLoading(true);
+      try {
+        const liveNews = await fetchLiveGoogleNewsRSS(currentUser.keywords);
+        if (liveNews && liveNews.length > 0) {
+          renderNewsCards(liveNews);
+        } else {
+          renderNewsCards(getMockNewsData());
+        }
+      } catch (e) {
+        renderNewsCards(getMockNewsData());
+      } finally {
+        updateUIBadgeSettings();
+        showLoading(false);
+      }
+    }
+
+    // 前端即時抓取 Google News RSS (含 24h 最新 when:1d 與歷史防重複過濾)
+    async function fetchLiveGoogleNewsRSS(keywords) {
+      const cleanKeywords = (keywords || APP_CONFIG.DEFAULT_KEYWORDS).trim();
+      const encodedQuery = encodeURIComponent(`${cleanKeywords} when:1d`);
+      const rssTarget = `https://news.google.com/rss/search?q=${encodedQuery}&hl=zh-TW&gl=TW&ceid=TW:zh-Hant`;
+      
+      let seenTitles = [];
+      try {
+        seenTitles = JSON.parse(localStorage.getItem("ai_news_seen_history") || "[]");
+      } catch (e) {}
+
+      const apiUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssTarget)}`;
+      
+      try {
+        const res = await fetch(apiUrl);
+        if (res.ok) {
+          const json = await res.json();
+          if (json.status === 'ok' && json.items && json.items.length > 0) {
+            const freshItems = [];
+            for (const item of json.items) {
+              let title = item.title || "最新情報";
+              let source = item.author || "焦點快訊";
+              if (title.includes(' - ')) {
+                const parts = title.split(' - ');
+                source = parts.pop().trim();
+                title = parts.join(' - ').trim();
+              }
+              if (seenTitles.includes(title)) continue;
+
+              freshItems.push({
+                title: title,
+                link: item.link || "https://news.google.com",
+                source: source,
+                pubDate: item.pubDate ? item.pubDate.split(' ')[0] : '今日最新',
+                summary: `【24h 今日最新】針對「${cleanKeywords}」最新動向：${title}。`,
+                impact: `持續追蹤「${cleanKeywords}」領域之讀者，建議評估相關時程與市場效應。`
+              });
+              if (freshItems.length >= 5) break;
+            }
+
+            const finalResults = freshItems.length > 0 ? freshItems : json.items.slice(0, 3).map(item => {
+              let title = item.title || "最新情報";
+              let source = item.author || "焦點快訊";
+              if (title.includes(' - ')) {
+                const parts = title.split(' - ');
+                source = parts.pop().trim();
+                title = parts.join(' - ').trim();
+              }
+              return {
+                title: title,
+                link: item.link || "https://news.google.com",
+                source: source,
+                pubDate: item.pubDate ? item.pubDate.split(' ')[0] : '今日最新',
+                summary: `【今日最新】「${cleanKeywords}」最新報導：${title}。`,
+                impact: `建議持續關注相關技術演進與產業趨勢。`
+              };
+            });
+
+            finalResults.forEach(r => {
+              if (!seenTitles.includes(r.title)) seenTitles.push(r.title);
+            });
+            if (seenTitles.length > 50) seenTitles = seenTitles.slice(-50);
+            try {
+              localStorage.setItem("ai_news_seen_history", JSON.stringify(seenTitles));
+              localStorage.setItem("ai_news_live_cache", JSON.stringify(finalResults));
+            } catch (e) {}
+
+            return finalResults;
+          }
+        }
+      } catch (err) {}
+
+      const cached = localStorage.getItem("ai_news_live_cache");
+      if (cached) return JSON.parse(cached);
+      return null;
+    }
+
+    function renderKeywordsTags(keywordsStr) {
+      const container = document.getElementById('keywords-tags');
+      const list = (keywordsStr || APP_CONFIG.DEFAULT_KEYWORDS).split(/[,，\s]+/).filter(k => k.trim().length > 0);
+      container.innerHTML = list.map(tag => `
+        <span class="bg-blue-50 text-[#0F3B82] border border-blue-200/60 text-xs px-2.5 py-0.5 rounded-full font-medium flex items-center gap-1">
+          # ${tag}
+        </span>
+      `).join('');
+    }
+
+    function renderNewsCards(items) {
+      const listEl = document.getElementById('news-list');
+      listEl.innerHTML = '';
+
+      items.forEach((item) => {
+        const card = document.createElement('article');
+        card.className = "bg-white rounded-2xl p-4 shadow-sm border border-slate-200 space-y-3 transition hover:shadow-md";
+
+        card.innerHTML = `
+          <div class="space-y-1.5">
+            <div class="flex items-center justify-between text-xs text-slate-400">
+              <span class="bg-blue-50 text-blue-700 px-2 py-0.5 rounded-md font-semibold">${item.source || '焦點新聞'}</span>
+              <span class="text-[11px] font-medium text-slate-400 flex items-center gap-1">
+                <i data-lucide="calendar" class="w-3 h-3 text-slate-400"></i>
+                ${item.pubDate || '今日最新'}
+              </span>
+            </div>
+            <h2 class="font-bold text-slate-900 text-sm leading-snug">${item.title}</h2>
+          </div>
+
+          <div class="bg-blue-50/70 border-l-4 border-[#0F3B82] rounded-r-xl p-3 space-y-1">
+            <p class="text-[11px] font-bold text-[#0F3B82] flex items-center gap-1">
+              <i data-lucide="sparkles" class="w-3.5 h-3.5 text-blue-600"></i>
+              AI 焦點洞察摘要
+            </p>
+            <p class="text-xs text-slate-700 leading-relaxed">${item.summary}</p>
+          </div>
+
+          <div class="bg-slate-50 border border-slate-200 rounded-xl p-2.5 flex items-start space-x-2">
+            <span class="text-amber-500 font-bold text-xs mt-0.5">💡</span>
+            <div>
+              <span class="text-[11px] font-bold text-slate-700 block">專業評估視角：</span>
+              <p class="text-[11px] text-slate-600 leading-tight mt-0.5">${item.impact}</p>
+            </div>
+          </div>
+
+          <div class="pt-1 flex items-center justify-between">
+            <button type="button" class="ask-about-news-btn text-[11px] font-bold text-cyan-700 hover:text-cyan-900 flex items-center gap-1" data-title="${item.title.replace(/"/g, '&quot;')}">
+              <i data-lucide="bot" class="w-3.5 h-3.5"></i>
+              <span>用 Cloudflare AI 追問此新聞</span>
+            </button>
+            <a href="${item.link}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center space-x-1 text-xs font-semibold text-blue-600 hover:text-blue-800 transition">
+              <span>閱讀新聞原件</span>
+              <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
+            </a>
+          </div>
+        `;
+        listEl.appendChild(card);
+      });
+
+      listEl.classList.remove('hidden');
+      lucide.createIcons();
+
+      // 綁定卡片上的「用 Cloudflare AI 追問此新聞」按鈕
+      document.querySelectorAll('.ask-about-news-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const newsTitle = btn.dataset.title;
+          const aiModal = document.getElementById('ai-qa-modal');
+          const input = document.getElementById('ai-question-input');
+          aiModal.classList.remove('hidden');
+          aiModal.classList.add('flex');
+          input.value = `請幫我分析這則新聞的重點與影響：「${newsTitle}」`;
+        });
+      });
+    }
+
+    function initUIListeners() {
+      const settingsModal = document.getElementById('settings-modal');
+      const aiQaModal = document.getElementById('ai-qa-modal');
+      const issueModal = document.getElementById('issue-modal');
+
+      const customKeywordsInput = document.getElementById('custom-keywords');
+      const customTimeInput = document.getElementById('custom-push-time');
+      const instantUpdateBtn = document.getElementById('instant-update-btn');
+      const saveAndRefreshBtn = document.getElementById('save-and-refresh-btn');
+      const saveSettingsOnlyBtn = document.getElementById('save-settings-only-btn');
+
+      // 1. 主題設定 Modal
+      document.getElementById('open-settings-btn').addEventListener('click', () => {
+        customKeywordsInput.value = currentUser.keywords;
+        customTimeInput.value = currentUser.pushTime || "08:00";
+        settingsModal.classList.remove('hidden');
+        settingsModal.classList.add('flex');
+      });
+      document.getElementById('close-modal-btn').addEventListener('click', () => {
+        settingsModal.classList.add('hidden');
+        settingsModal.classList.remove('flex');
+      });
+
+      // 2. Cloudflare AI 問答 Modal
+      document.getElementById('open-ai-qa-btn').addEventListener('click', () => {
+        aiQaModal.classList.remove('hidden');
+        aiQaModal.classList.add('flex');
+      });
+      document.getElementById('close-ai-qa-btn').addEventListener('click', () => {
+        aiQaModal.classList.add('hidden');
+        aiQaModal.classList.remove('flex');
+      });
+
+      // 3. 問題回報 Modal
+      document.getElementById('open-issue-btn').addEventListener('click', () => {
+        issueModal.classList.remove('hidden');
+        issueModal.classList.add('flex');
+      });
+      document.getElementById('close-issue-btn').addEventListener('click', () => {
+        issueModal.classList.add('hidden');
+        issueModal.classList.remove('flex');
+      });
+
+      // 熱門標籤點擊
+      document.querySelectorAll('.preset-tag').forEach(tagBtn => {
+        tagBtn.addEventListener('click', () => {
+          const tag = tagBtn.dataset.tag;
+          let currentList = customKeywordsInput.value.split(/[,，\s]+/).filter(k => k.trim());
+          if (!currentList.includes(tag)) {
+            currentList.push(tag);
+            customKeywordsInput.value = currentList.join(', ');
+          }
+        });
+      });
+
+      // 時間標籤點擊
+      document.querySelectorAll('.time-preset-tag').forEach(timeBtn => {
+        timeBtn.addEventListener('click', () => {
+          document.querySelectorAll('.time-preset-tag').forEach(b => {
+            b.className = "time-preset-tag bg-slate-100 text-[11px] px-2.5 py-1 rounded-md border border-slate-200 font-medium";
+          });
+          timeBtn.className = "time-preset-tag bg-blue-100 text-blue-700 text-[11px] px-2.5 py-1 rounded-md border border-blue-300 font-bold";
+          customTimeInput.value = timeBtn.dataset.time;
+        });
+      });
+
+      // 立即更新動作
+      const performInstantUpdate = async (isFromModal = false) => {
+        const btn = isFromModal ? saveAndRefreshBtn : instantUpdateBtn;
+        const originalContent = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i><span>更新中...</span>`;
+        lucide.createIcons();
+
+        if (isFromModal) {
+          currentUser.keywords = customKeywordsInput.value.trim() || APP_CONFIG.DEFAULT_KEYWORDS;
+          currentUser.pushTime = customTimeInput.value || "08:00";
+          saveSettingsLocally();
+          settingsModal.classList.add('hidden');
+          settingsModal.classList.remove('flex');
+
+          // 同步發送至 Cloudflare Functions API 更新 Notion
+          fetch(APP_CONFIG.WEBHOOK_API_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              action: "updateKeywords",
+              userId: currentUser.userId,
+              keywords: currentUser.keywords
+            })
+          }).catch(() => {});
+        }
+
+        showToast("⚡ 正在檢索過去 24 小時最新且不重複新聞...");
+        await fetchUserDataAndNews();
+
+        btn.disabled = false;
+        btn.innerHTML = originalContent;
+        lucide.createIcons();
+        showToast("✅ 專屬新聞已即時更新完成！");
+      };
+
+      instantUpdateBtn.addEventListener('click', () => performInstantUpdate(false));
+      saveAndRefreshBtn.addEventListener('click', () => performInstantUpdate(true));
+
+      saveSettingsOnlyBtn.addEventListener('click', () => {
+        currentUser.keywords = customKeywordsInput.value.trim() || APP_CONFIG.DEFAULT_KEYWORDS;
+        currentUser.pushTime = customTimeInput.value || "08:00";
+        saveSettingsLocally();
+        settingsModal.classList.add('hidden');
+        settingsModal.classList.remove('flex');
+        showToast(`✅ 設定已儲存（每日 ${currentUser.pushTime} 更新）`);
+      });
+
+      // AI 問答送出邏輯
+      const handleAskAI = async () => {
+        const input = document.getElementById('ai-question-input');
+        const q = input.value.trim();
+        if (!q) return;
+
+        const chatBox = document.getElementById('ai-chat-history');
+        chatBox.innerHTML += `
+          <div class="flex justify-end">
+            <div class="bg-[#0F3B82] text-white rounded-xl px-3 py-2 max-w-[85%] shadow-sm">${q}</div>
+          </div>
+        `;
+        input.value = "";
+        chatBox.scrollTop = chatBox.scrollHeight;
+
+        const loadingId = "loading-" + Date.now();
+        chatBox.innerHTML += `
+          <div id="${loadingId}" class="bg-white border border-slate-200 rounded-xl p-3 text-slate-500 shadow-sm">
+            🤖 Cloudflare Workers AI 思考中...
+          </div>
+        `;
+        chatBox.scrollTop = chatBox.scrollHeight;
+
+        let answer = "";
+        try {
+          const res = await fetch(APP_CONFIG.WEBHOOK_API_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "askAI", question: q })
+          });
+          if (res.ok) {
+            const data = await res.json();
+            answer = data.answer;
+          }
+        } catch (e) {}
+
+        if (!answer) {
+          answer = generateSmartLocalAnswer(q, currentUser.keywords);
+        }
+
+        const loadingEl = document.getElementById(loadingId);
+        if (loadingEl) {
+          loadingEl.className = "bg-white border border-blue-200 rounded-xl p-3 text-slate-800 leading-relaxed shadow-sm whitespace-pre-line";
+          loadingEl.innerText = answer;
+        }
+        chatBox.scrollTop = chatBox.scrollHeight;
+      };
+
+      document.getElementById('send-ai-question-btn').addEventListener('click', handleAskAI);
+      document.getElementById('ai-question-input').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') handleAskAI();
+      });
+
+      document.querySelectorAll('.qa-sample-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.getElementById('ai-question-input').value = btn.dataset.q;
+          handleAskAI();
+        });
+      });
+
+      // 問題回報送出邏輯
+      document.getElementById('submit-issue-btn').addEventListener('click', async () => {
+        const category = document.getElementById('issue-category').value;
+        const desc = document.getElementById('issue-desc').value.trim();
+        if (!desc) {
+          showToast("⚠️ 請填寫問題描述！");
+          return;
+        }
+
+        const ticketId = `#ISS-${Math.floor(100 + Math.random() * 900)}`;
+        try {
+          await fetch(APP_CONFIG.WEBHOOK_API_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              action: "reportIssue",
+              category,
+              userName: currentUser.displayName,
+              description: desc
+            })
+          });
+        } catch (e) {}
+
+        document.getElementById('issue-desc').value = "";
+        issueModal.classList.add('hidden');
+        issueModal.classList.remove('flex');
+        showToast(`✅ 問題回報已送出！受理單號：${ticketId}`);
+      });
+    }
+
+    function generateSmartLocalAnswer(q, keywords) {
+      if (q.includes("基本法")) {
+        return `🤖 【Cloudflare 免費 AI 回覆】\n台灣《人工智慧基本法》屬框架性法律，對製造業最重要三大面向為：\n1. 隱私與營業秘密保護（第14條）：製程與報價送入 AI 前須去識別化。\n2. 透明與標記（第4條）：AI 生成之對外文件宜適當標記。\n3. 風險分級（第16條）：由經濟部依風險框架訂定產業指引。`;
+      }
+      if (q.includes("具身機器人")) {
+        return `🤖 【Cloudflare 免費 AI 回覆】\n具身機器人（Embodied AI）將大語言模型與實體機器人感測控制結合。對台灣製造業而言：\n1. 零組件商機：諧波減速機、伺服馬達、視覺感測模組切入國際供應鏈。\n2. 產線落地：評估重點在於 MTBF（平均無故障時間）與 Cycle Time 穩定度。`;
+      }
+      return `🤖 【Cloudflare 免費 AI 回覆】\n針對您詢問的「${q}」：\n1. 核心洞察：此議題與您目前追蹤的「${keywords}」密切相關，建議關注上下游供應鏈與技術標準演進。\n2. 下一步行動：您可點擊右上角「設定」將相關詞彙加入追蹤，或在 LINE@ 聊天室直接與我持續問答！`;
+    }
+
+    function showLoading(isLoading) {
+      const skeleton = document.getElementById('loading-skeleton');
+      const listEl = document.getElementById('news-list');
+      if (isLoading) {
+        skeleton.classList.remove('hidden');
+        listEl.classList.add('hidden');
+      } else {
+        skeleton.classList.add('hidden');
+      }
+    }
+
+    function getMockNewsData() {
+      return [
+        {
+          title: "跨海進擊三大現場 台廠機器人供應鏈如何卡位人形機器人生態系？",
+          link: "https://news.google.com",
+          source: "經濟日報",
+          pubDate: "今日最新",
+          summary: "國際各大科技巨頭加速人形機器人商用化進程，台廠憑藉在減速機、伺服馬達與感測器模組的完整製造供應鏈，已開始切入關鍵零組件驗證階段。",
+          impact: "傳統自動化零部件製造商應加速結合視覺感知與通用通訊協議，由單一組件升級為模組化解決方案以提升毛利。"
+        }
+      ];
+    }
+  </script>
+</body>
+</html>

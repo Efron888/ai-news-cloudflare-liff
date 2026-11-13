@@ -1,0 +1,15 @@
+name = "ai-news-cloudflare-liff"
+main = "src/worker.js"
+compatibility_date = "2024-11-01"
+
+[assets]
+directory = "./public"
+binding = "ASSETS"
+
+[ai]
+binding = "AI"
+
+[vars]
+NOTION_SETTINGS_DB_ID = "44b5e6a1-2dbe-4720-8b53-1b20ebd75a9e"
+NOTION_NEWS_DB_ID = "0fd40ae9-c5d0-4dcf-a84b-de7037cd7e29"
+NOTION_ISSUES_DB_ID = "68392eb2-9653-4921-8005-08b391541701"

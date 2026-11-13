@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>產品介紹互動簡報 — AI 產業情報專刊 (LINE@ × LIFF × Cloudflare AI)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    body {
+      font-family: "Microsoft JhengHei", "微軟正黑體", system-ui, sans-serif;
+      background-color: #0B192C;
+      user-select: none;
+    }
+    .slide-aspect {
+      aspect-ratio: 16 / 9;
+      width: 100%;
+      max-width: 1120px;
+    }
+    .slide-fade {
+      animation: fadeIn 0.3s ease-out;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col text-slate-800">
+
+  <!-- 頂部控制與下載導航列 -->
+  <header class="bg-[#0F3B82] text-white border-b border-white/15 px-4 py-2.5 shadow-lg z-30">
+    <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
+      <!-- 左側標題與返回作品按鈕 -->
+      <div class="flex items-center space-x-3">
+        <a href="index.html" class="flex items-center space-x-1.5 bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-lg text-xs font-bold transition">
+          <i data-lucide="arrow-left" class="w-4 h-4"></i>
+          <span>返回 LINE LIFF 作品</span>
+        </a>
+        <div class="h-4 w-px bg-white/20 hidden sm:block"></div>
+        <div class="flex items-center space-x-2">
+          <span class="bg-blue-500 text-white text-[11px] font-bold px-2 py-0.5 rounded">HTML + Canva 雙模簡報</span>
+          <h1 class="text-sm font-bold tracking-wide hidden md:block">LINE@ × LINE LIFF × Cloudflare 免費 AI 實戰介紹</h1>
+        </div>
+      </div>
+
+      <!-- 中間檢視模式切換 -->
+      <div class="flex items-center bg-slate-900/50 p-1 rounded-xl border border-white/10">
+        <button id="mode-html-btn" class="px-3 py-1 rounded-lg text-xs font-bold bg-[#2563EB] text-white transition flex items-center space-x-1">
+          <i data-lucide="mouse-pointer-click" class="w-3.5 h-3.5"></i>
+          <span>互動式 HTML 簡報 (可點擊)</span>
+        </button>
+        <button id="mode-canva-btn" class="px-3 py-1 rounded-lg text-xs font-bold text-blue-200 hover:text-white transition flex items-center space-x-1">
+          <i data-lucide="palette" class="w-3.5 h-3.5"></i>
+          <span>Canva 設計原稿檢視</span>
+        </button>
+      </div>
+
+      <!-- 右側：下載與 Canva 編輯按鈕群 -->
+      <div class="flex items-center space-x-2">
+        <a href="downloads/AI_News_LIFF_Canva_Slides.pptx" download="AI_產業情報專刊_Canva簡報.pptx" class="flex items-center space-x-1 bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow transition">
+          <i data-lucide="download" class="w-3.5 h-3.5"></i>
+          <span>下載 PPTX</span>
+        </a>
+        <a href="downloads/AI_News_LIFF_Canva_Slides.pdf" download="AI_產業情報專刊_Canva簡報.pdf" class="flex items-center space-x-1 bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow transition">
+          <i data-lucide="file-down" class="w-3.5 h-3.5"></i>
+          <span>下載 PDF</span>
+        </a>
+        <button id="download-html-btn" class="flex items-center space-x-1 bg-amber-500 hover:bg-amber-400 text-slate-950 px-3 py-1.5 rounded-lg text-xs font-bold shadow transition">
+          <i data-lucide="code" class="w-3.5 h-3.5"></i>
+          <span>下載 HTML 簡報</span>
+        </button>
+        <a href="https://canva.link/j76h9iswyqp364j" target="_blank" rel="noopener" class="flex items-center space-x-1 bg-white/15 hover:bg-white/25 text-white px-2.5 py-1.5 rounded-lg text-xs font-semibold transition" title="在 Canva 中開啟">
+          <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
+          <span class="hidden lg:inline">Canva 線上版</span>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- 簡報主舞台區 (點擊畫面左右即可換頁) -->
+  <main class="flex-1 flex flex-col items-center justify-center p-4 md:p-8 relative">
+    
+    <!-- 16:9 簡報畫布 -->
+    <div id="slide-stage" class="slide-aspect bg-white rounded-2xl shadow-2xl border-2 border-white/20 overflow-hidden relative flex flex-col cursor-pointer" title="點擊畫面右側下一頁 / 左側上一頁">
+      
+      <!-- 頂部品牌裝飾條 -->
+      <div class="h-2 w-full bg-gradient-to-r from-[#0F3B82] via-[#2563EB] to-cyan-500"></div>
+
+      <!-- HTML 互動簡報內容容器 -->
+      <div id="html-slide-content" class="flex-1 p-6 sm:p-10 md:p-12 flex flex-col justify-between slide-fade overflow-y-auto">
+        <!-- 由 JS 動態渲染當前頁 -->
+      </div>
+
+      <!-- Canva 圖片模式容器 -->
+      <div id="canva-slide-content" class="hidden flex-1 bg-slate-900 items-center justify-center relative">
+        <img id="canva-slide-img" src="slides/slide_1.png" alt="Canva Slide" class="w-full h-full object-contain">
+      </div>
+
+      <!-- 底部投影片頁尾資訊列 -->
+      <div class="bg-slate-50 border-t border-slate-200 px-6 py-2.5 flex items-center justify-between text-xs text-slate-500">
+        <div class="flex items-center space-x-2">
+          <span class="font-bold text-[#0F3B82]">AI 產業情報專刊</span>
+          <span>｜</span>
+          <span>Git × Cloudflare Workers AI × LINE@ & LIFF × Notion</span>
+        </div>
+        <div id="slide-page-indicator" class="font-bold text-[#2563EB]">
+          Slide 1 / 6
+        </div>
+      </div>
+
+    </div>
+
+    <!-- 底部點擊換頁控制器 -->
+    <div class="mt-5 flex items-center space-x-4 bg-slate-900/90 border border-white/15 px-5 py-2.5 rounded-full shadow-xl">
+      <button id="prev-btn" class="flex items-center space-x-1 text-white hover:text-blue-400 disabled:opacity-30 transition text-xs font-bold px-2 py-1">
+        <i data-lucide="chevron-left" class="w-4 h-4"></i>
+        <span>上一頁</span>
+      </button>
+
+      <!-- 頁碼圓點 (可直接點擊跳頁) -->
+      <div id="dots-container" class="flex items-center space-x-2"></div>
+
+      <button id="next-btn" class="flex items-center space-x-1 text-white hover:text-blue-400 disabled:opacity-30 transition text-xs font-bold px-2 py-1">
+        <span>下一頁</span>
+        <i data-lucide="chevron-right" class="w-4 h-4"></i>
+      </button>
+
+      <div class="h-4 w-px bg-white/20"></div>
+
+      <button id="fullscreen-btn" class="text-slate-300 hover:text-white p-1 transition" title="全螢幕簡報">
+        <i data-lucide="maximize" class="w-4 h-4"></i>
+      </button>
+    </div>
+
+    <p class="mt-2 text-[11px] text-slate-400">
+      💡 提示：直接用滑鼠「點擊簡報畫面」、點擊下方頁碼圓點，或按鍵盤 ⬅️ ➡️ 方向鍵即可切換投影片。
+    </p>
+  </main>
+
+  <script>
+    const SLIDES_DATA = [
+      {
+        badge: "PROJECT OVERVIEW ｜ 作品總覽",
+        title: "AI 產業情報專刊：LINE@ × LINE LIFF × Cloudflare 免費 AI",
+        subtitle: "結合個人化 24h 最新新聞日報、LINE Messaging API 智慧問答與 Notion 雲端資料庫的全雲端實戰作品",
+        contentHtml: `
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-5 my-auto">
+            <div class="bg-blue-50/70 border-2 border-[#0F3B82]/20 rounded-2xl p-5 space-y-2">
+              <div class="w-10 h-10 bg-[#0F3B82] text-white rounded-xl flex items-center justify-center font-bold">1</div>
+              <h3 class="font-bold text-base text-[#0F3B82]">LINE@ 結合 LINE LIFF</h3>
+              <p class="text-xs text-slate-600 leading-relaxed">
+                從 LINE 官方帳號點擊圖文選單即開啟 LIFF 全螢幕長網頁，自動辨識用戶身分，突破每月 200 則免費推播限制，無限次瀏覽個人化產業日報。
+              </p>
+            </div>
+            <div class="bg-blue-50/70 border-2 border-[#2563EB]/30 rounded-2xl p-5 space-y-2">
+              <div class="w-10 h-10 bg-[#2563EB] text-white rounded-xl flex items-center justify-center font-bold">2</div>
+              <h3 class="font-bold text-base text-[#2563EB]">HTML 點擊簡報 & Canva 下載</h3>
+              <p class="text-xs text-slate-600 leading-relaxed">
+                內建本互動式 HTML 簡報，支援滑鼠點擊翻頁，完整說明「產品怎麼用」與「問題怎麼回報」，並可一鍵下載 PPTX、PDF 與 HTML 檔案。
+              </p>
+            </div>
+            <div class="bg-blue-50/70 border-2 border-cyan-600/30 rounded-2xl p-5 space-y-2">
+              <div class="w-10 h-10 bg-cyan-600 text-white rounded-xl flex items-center justify-center font-bold">3</div>
+              <h3 class="font-bold text-base text-cyan-800">Message API × Cloudflare 免費 AI</h3>
+              <p class="text-xs text-slate-600 leading-relaxed">
+                串接 LINE Messaging API 與 Cloudflare Workers AI 每日免費 AI 額度，讓同學在 LINE 聊天室或 LIFF 網頁內直接進行 AI 互動問答！
+              </p>
+            </div>
+          </div>
+        `
+      },
+      {
+        badge: "SYSTEM ARCHITECTURE ｜ 雲端架構",
+        title: "全雲端零成本架構：Git × Cloudflare × LINE × Notion",
+        subtitle: "程式碼託管於 GitHub，透過 Cloudflare Pages & Workers 部署全球網域與免費 AI 推論",
+        contentHtml: `
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-4 my-auto">
+            <div class="bg-white border border-slate-200 shadow-sm rounded-xl p-4 space-y-2">
+              <span class="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">1. 程式與排程層</span>
+              <h4 class="font-bold text-sm text-slate-900">GitHub + Actions</h4>
+              <ul class="text-xs text-slate-600 space-y-1 list-disc pl-4">
+                <li>獨立 Git 儲存庫版本控制</li>
+                <li>每日定時自動抓取 24h 最新新聞</li>
+                <li>歷史去重機制確保每天不重複</li>
+              </ul>
+            </div>
+            <div class="bg-white border border-slate-200 shadow-sm rounded-xl p-4 space-y-2">
+              <span class="text-xs font-bold text-orange-600 bg-orange-50 px-2 py-0.5 rounded">2. 雲端與 AI 層</span>
+              <h4 class="font-bold text-sm text-slate-900">Cloudflare Pages + AI</h4>
+              <ul class="text-xs text-slate-600 space-y-1 list-disc pl-4">
+                <li>提供全球免費 HTTPS 專屬網域</li>
+                <li>內建 Workers AI 每日免費額度</li>
+                <li>執行 Llama-3.1 / Gemini 雙引擎問答</li>
+              </ul>
+            </div>
+            <div class="bg-white border border-slate-200 shadow-sm rounded-xl p-4 space-y-2">
+              <span class="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded">3. 前端與互動層</span>
+              <h4 class="font-bold text-sm text-slate-900">LINE@ + LINE LIFF</h4>
+              <ul class="text-xs text-slate-600 space-y-1 list-disc pl-4">
+                <li>LIFF 長網頁閱讀與⚡立即更新</li>
+                <li>LINE Messaging API 自動回覆問答</li>
+                <li>內建問題回報與互動簡報入口</li>
+              </ul>
+            </div>
+            <div class="bg-white border border-slate-200 shadow-sm rounded-xl p-4 space-y-2">
+              <span class="text-xs font-bold text-purple-600 bg-purple-50 px-2 py-0.5 rounded">4. 雲端資料庫層</span>
+              <h4 class="font-bold text-sm text-slate-900">Notion 雲端中心</h4>
+              <ul class="text-xs text-slate-600 space-y-1 list-disc pl-4">
+                <li><b>AI新聞_用戶設定</b>：管理個人關鍵字</li>
+                <li><b>AI新聞_今日產出</b>：儲存每日摘要</li>
+                <li><b>AI新聞_問題回報</b>：工單即時追蹤</li>
+              </ul>
+            </div>
+          </div>
+        `
+      },
+      {
+        badge: "QUESTION A-1 ｜ 產品使用教學（一）",
+        title: "a. 這個產品怎麼用它？（新聞閱讀、設定主題與立即更新）",
+        subtitle: "3 個步驟輕鬆打造您的個人化每日 AI 情報專刊",
+        contentHtml: `
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-5 my-auto">
+            <div class="bg-slate-50 border-l-4 border-[#0F3B82] rounded-r-xl p-5 space-y-2">
+              <div class="text-xs font-bold text-[#0F3B82]">STEP 01 ｜ 開啟專刊</div>
+              <h4 class="font-bold text-base text-slate-900">從 LINE 點開 LIFF 長網頁</h4>
+              <p class="text-xs text-slate-600 leading-relaxed">
+                在 LINE@ 官方帳號點擊圖文選單，即刻全螢幕開啟數位專刊。系統透過 LIFF SDK 自動識別您的 LINE 暱稱與頭像（電腦瀏覽器開啟則提供預覽模式）。
+              </p>
+            </div>
+            <div class="bg-slate-50 border-l-4 border-[#2563EB] rounded-r-xl p-5 space-y-2">
+              <div class="text-xs font-bold text-[#2563EB]">STEP 02 ｜ 自訂主題與時間</div>
+              <h4 class="font-bold text-base text-slate-900">點擊「設定主題」與推送時間</h4>
+              <p class="text-xs text-slate-600 leading-relaxed">
+                點擊右上角「設定主題」，可一鍵點選熱門標籤（具身機器人、製造業 AI、智慧工廠等）或自由輸入任何關鍵字，並設定每日更新時間（如 08:00 上班首選）。
+              </p>
+            </div>
+            <div class="bg-slate-50 border-l-4 border-emerald-600 rounded-r-xl p-5 space-y-2">
+              <div class="text-xs font-bold text-emerald-700">STEP 03 ｜ 秒級即時更新</div>
+              <h4 class="font-bold text-base text-slate-900">點擊「⚡ 立即更新」抓取最新報導</h4>
+              <p class="text-xs text-slate-600 leading-relaxed">
+                隨時點擊「⚡ 立即更新」，系統立即聯網檢索<b>過去 24 小時內發布（when:1d）</b>的最新新聞，自動比對已讀歷史確保<b>每天絕不重複</b>，並生成 AI 摘要卡片！
+              </p>
+            </div>
+          </div>
+        `
+      },
+      {
+        badge: "QUESTION A-2 ｜ 產品使用教學（二）",
+        title: "a. 這個產品怎麼用它？（Message API × Cloudflare 免費 AI 問答）",
+        subtitle: "結合 LINE Messaging API 與 Cloudflare Workers AI 每日免費額度，支援雙管道 AI 問答",
+        contentHtml: `
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6 my-auto">
+            <div class="bg-blue-50/60 border border-blue-200 rounded-2xl p-6 space-y-3">
+              <div class="flex items-center justify-between">
+                <span class="bg-[#0F3B82] text-white text-xs font-bold px-3 py-1 rounded-full">方式一：在 LINE 聊天室直接問答</span>
+                <span class="text-xs font-semibold text-blue-700">LINE Messaging API</span>
+              </div>
+              <h4 class="font-bold text-base text-slate-900">直接在 LINE@ 對話框打字提問</h4>
+              <ul class="text-xs text-slate-700 space-y-2 list-disc pl-4 leading-relaxed">
+                <li><b>自由 AI 問答</b>：在 LINE 官方帳號對話框輸入任何問題（如：「<i>什麼是具身機器人？對台灣工廠有何幫助？</i>」），Cloudflare Worker 立即調用<b>每日免費 AI 額度</b>產生專業繁中解答並免費 Reply 回覆！</li>
+                <li><b>快速修改關鍵字</b>：輸入「<code>關鍵字：北海道楓葉, 半導體</code>」，免開網頁直接同步更新設定！</li>
+              </ul>
+            </div>
+
+            <div class="bg-indigo-50/60 border border-indigo-200 rounded-2xl p-6 space-y-3">
+              <div class="flex items-center justify-between">
+                <span class="bg-[#2563EB] text-white text-xs font-bold px-3 py-1 rounded-full">方式二：在 LIFF 網頁內直接問答</span>
+                <span class="text-xs font-semibold text-indigo-700">Cloudflare Workers AI</span>
+              </div>
+              <h4 class="font-bold text-base text-slate-900">點擊 LIFF 上方「🤖 AI 問答」按鈕</h4>
+              <ul class="text-xs text-slate-700 space-y-2 list-disc pl-4 leading-relaxed">
+                <li><b>閱讀新聞同步提問</b>：在閱讀今日新聞時，點擊導航列的「🤖 AI 問答」即可打開對話視窗。</li>
+                <li><b>零成本高效推論</b>：後端綁定 Cloudflare <code>[ai] binding = "AI"</code>（<code>@cf/meta/llama-3.1-8b-instruct</code> 免費額度）與 Gemini Flash 備援，快速解答延伸問題。</li>
+              </ul>
+            </div>
+          </div>
+        `
+      },
+      {
+        badge: "QUESTION B ｜ 問題回報與追蹤機制",
+        title: "b. 如果有一些問題，我要怎麼回報？",
+        subtitle: "提供「LIFF 網頁表單」與「LINE 對話指令」雙管道回報，全自動寫入 Notion 問題回報追蹤庫",
+        contentHtml: `
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-5 my-auto">
+            <div class="bg-amber-50/70 border border-amber-200 rounded-2xl p-5 space-y-2.5">
+              <div class="text-xs font-bold text-amber-800 bg-amber-200/70 inline-block px-2.5 py-0.5 rounded">管道 1：LIFF 網頁一鍵回報</div>
+              <h4 class="font-bold text-base text-slate-900">點擊頂部「🛠️ 問題回報」按鈕</h4>
+              <p class="text-xs text-slate-600 leading-relaxed">
+                在 LIFF 網頁右上角點擊「問題回報」，選擇問題類別（<b>功能異常／新聞內容問題／操作疑問／功能建議</b>），填寫狀況後按送出，立即取得受理單號（如 <code>#ISS-801</code>）。
+              </p>
+            </div>
+
+            <div class="bg-blue-50/70 border border-blue-200 rounded-2xl p-5 space-y-2.5">
+              <div class="text-xs font-bold text-blue-800 bg-blue-200/70 inline-block px-2.5 py-0.5 rounded">管道 2：LINE 對話框回報</div>
+              <h4 class="font-bold text-base text-slate-900">傳送「回報：問題內容」</h4>
+              <p class="text-xs text-slate-600 leading-relaxed">
+                直接在 LINE@ 聊天室輸入：<br>
+                <code class="bg-white px-2 py-0.5 rounded border text-blue-700 font-bold">回報：某篇新聞連結無法開啟</code><br>
+                LINE Webhook 會自動立案並立即回覆您專屬工單編號。
+              </p>
+            </div>
+
+            <div class="bg-emerald-50/70 border border-emerald-200 rounded-2xl p-5 space-y-2.5">
+              <div class="text-xs font-bold text-emerald-800 bg-emerald-200/70 inline-block px-2.5 py-0.5 rounded">管道 3：Notion 雲端自動追蹤</div>
+              <h4 class="font-bold text-base text-slate-900">同步寫入 Notion「AI新聞_問題回報」</h4>
+              <p class="text-xs text-slate-600 leading-relaxed">
+                所有回報皆自動寫入 Notion 雲端資料庫，包含<b>單號、類別、回報人、描述、回報時間與處理狀態（待處理／處理中／已解決）</b>，閉環管理不漏接！
+              </p>
+            </div>
+          </div>
+        `
+      },
+      {
+        badge: "SUMMARY & DOWNLOAD ｜ 總結與即刻體驗",
+        title: "作品成果總結與檔案下載專區",
+        subtitle: "100% 達成照片指定三項指標：LINE@ + LIFF 作品、可點擊可下載 HTML/Canva 簡報、Cloudflare 免費 AI 問答",
+        contentHtml: `
+          <div class="flex flex-col md:flex-row items-center justify-between gap-6 my-auto bg-slate-50 border border-slate-200 rounded-2xl p-6">
+            <div class="space-y-3 flex-1">
+              <h4 class="font-bold text-lg text-[#0F3B82]">✅ 驗收清單全數通過</h4>
+              <ul class="text-xs text-slate-700 space-y-2">
+                <li class="flex items-center gap-2"><span class="text-emerald-600 font-bold">✔</span> <b>1. LINE@ 結合 LINE LIFF 作品</b>：支援 24h 最新新聞、防重複、主題與時間設定、立即更新。</li>
+                <li class="flex items-center gap-2"><span class="text-emerald-600 font-bold">✔</span> <b>2. HTML 互動點擊簡報 + Canva 簡報</b>：完整解答 (a) 怎麼用它 (b) 怎麼回報問題，並支援一鍵下載。</li>
+                <li class="flex items-center gap-2"><span class="text-emerald-600 font-bold">✔</span> <b>3. Message API + Cloudflare 免費 AI</b>：支援 LINE 聊天室與 LIFF 網頁內雙向 AI 免費問答。</li>
+              </ul>
+            </div>
+            <div class="flex flex-col space-y-2.5 w-full md:w-72">
+              <a href="index.html" class="w-full bg-[#0F3B82] hover:bg-blue-800 text-white font-bold py-3 px-4 rounded-xl text-xs text-center shadow transition">
+                🚀 立即前往 LINE LIFF 實機作品
+              </a>
+              <a href="downloads/AI_News_LIFF_Canva_Slides.pptx" download="AI_產業情報專刊_Canva簡報.pptx" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 px-4 rounded-xl text-xs text-center shadow transition">
+                📥 下載 Canva PowerPoint (.pptx)
+              </a>
+              <a href="downloads/AI_News_LIFF_Canva_Slides.pdf" download="AI_產業情報專刊_Canva簡報.pdf" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-2.5 px-4 rounded-xl text-xs text-center shadow transition">
+                📄 下載 Canva PDF 簡報 (.pdf)
+              </a>
+            </div>
+          </div>
+        `
+      }
+    ];
+
+    let currentSlide = 0;
+    let viewMode = "html"; // 'html' or 'canva'
+
+    document.addEventListener("DOMContentLoaded", () => {
+      lucide.createIcons();
+      renderDots();
+      renderCurrentSlide();
+      bindEvents();
+    });
+
+    function renderDots() {
+      const container = document.getElementById("dots-container");
+      container.innerHTML = SLIDES_DATA.map((_, idx) => `
+        <button data-index="${idx}" class="slide-dot w-2.5 h-2.5 rounded-full transition-all ${idx === currentSlide ? 'bg-blue-400 w-6' : 'bg-white/30 hover:bg-white/60'}" title="第 ${idx + 1} 頁"></button>
+      `).join("");
+
+      document.querySelectorAll(".slide-dot").forEach(btn => {
+        btn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          currentSlide = parseInt(btn.dataset.index, 10);
+          renderCurrentSlide();
+        });
+      });
+    }
+
+    function renderCurrentSlide() {
+      const slide = SLIDES_DATA[currentSlide];
+      const htmlContainer = document.getElementById("html-slide-content");
+      const canvaContainer = document.getElementById("canva-slide-content");
+      const canvaImg = document.getElementById("canva-slide-img");
+
+      if (viewMode === "html") {
+        htmlContainer.classList.remove("hidden");
+        canvaContainer.classList.add("hidden");
+        canvaContainer.classList.remove("flex");
+
+        htmlContainer.innerHTML = `
+          <div class="space-y-2 border-b border-slate-100 pb-4">
+            <span class="inline-block text-[11px] font-bold tracking-wider text-[#2563EB] bg-blue-50 px-3 py-1 rounded-full border border-blue-200/60">
+              ${slide.badge}
+            </span>
+            <h2 class="text-xl sm:text-2xl md:text-3xl font-extrabold text-[#0F3B82] leading-tight">
+              ${slide.title}
+            </h2>
+            <p class="text-xs sm:text-sm text-slate-500 font-medium">
+              ${slide.subtitle}
+            </p>
+          </div>
+          ${slide.contentHtml}
+        `;
+      } else {
+        htmlContainer.classList.add("hidden");
+        canvaContainer.classList.remove("hidden");
+        canvaContainer.classList.add("flex");
+        canvaImg.src = `slides/slide_${currentSlide + 1}.png`;
+      }
+
+      document.getElementById("slide-page-indicator").innerText = `Slide ${currentSlide + 1} / ${SLIDES_DATA.length}`;
+      document.getElementById("prev-btn").disabled = currentSlide === 0;
+      document.getElementById("next-btn").disabled = currentSlide === SLIDES_DATA.length - 1;
+
+      renderDots();
+      lucide.createIcons();
+    }
+
+    function bindEvents() {
+      document.getElementById("prev-btn").addEventListener("click", () => {
+        if (currentSlide > 0) {
+          currentSlide--;
+          renderCurrentSlide();
+        }
+      });
+
+      document.getElementById("next-btn").addEventListener("click", () => {
+        if (currentSlide < SLIDES_DATA.length - 1) {
+          currentSlide++;
+          renderCurrentSlide();
+        }
+      });
+
+      // 點擊簡報畫布左右切換
+      document.getElementById("slide-stage").addEventListener("click", (e) => {
+        if (e.target.closest("a") || e.target.closest("button")) return;
+        const rect = e.currentTarget.getBoundingClientRect();
+        const clickX = e.clientX - rect.left;
+        if (clickX < rect.width * 0.35) {
+          if (currentSlide > 0) {
+            currentSlide--;
+            renderCurrentSlide();
+          }
+        } else {
+          if (currentSlide < SLIDES_DATA.length - 1) {
+            currentSlide++;
+            renderCurrentSlide();
+          }
+        }
+      });
+
+      // 鍵盤左右方向鍵支援
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "ArrowRight" || e.key === " ") {
+          if (currentSlide < SLIDES_DATA.length - 1) {
+            currentSlide++;
+            renderCurrentSlide();
+          }
+        } else if (e.key === "ArrowLeft") {
+          if (currentSlide > 0) {
+            currentSlide--;
+            renderCurrentSlide();
+          }
+        }
+      });
+
+      // 切換 HTML 互動模式 vs Canva 原稿模式
+      const htmlBtn = document.getElementById("mode-html-btn");
+      const canvaBtn = document.getElementById("mode-canva-btn");
+
+      htmlBtn.addEventListener("click", () => {
+        viewMode = "html";
+        htmlBtn.className = "px-3 py-1 rounded-lg text-xs font-bold bg-[#2563EB] text-white transition flex items-center space-x-1";
+        canvaBtn.className = "px-3 py-1 rounded-lg text-xs font-bold text-blue-200 hover:text-white transition flex items-center space-x-1";
+        renderCurrentSlide();
+      });
+
+      canvaBtn.addEventListener("click", () => {
+        viewMode = "canva";
+        canvaBtn.className = "px-3 py-1 rounded-lg text-xs font-bold bg-[#2563EB] text-white transition flex items-center space-x-1";
+        htmlBtn.className = "px-3 py-1 rounded-lg text-xs font-bold text-blue-200 hover:text-white transition flex items-center space-x-1";
+        renderCurrentSlide();
+      });
+
+      // 全螢幕按鈕
+      document.getElementById("fullscreen-btn").addEventListener("click", () => {
+        const stage = document.getElementById("slide-stage");
+        if (!document.fullscreenElement) {
+          stage.requestFullscreen?.();
+        } else {
+          document.exitFullscreen?.();
+        }
+      });
+
+      // 一鍵下載獨立 HTML 簡報檔
+      document.getElementById("download-html-btn").addEventListener("click", () => {
+        const htmlContent = "<!DOCTYPE html>\n" + document.documentElement.outerHTML;
+        const blob = new Blob([htmlContent], { type: "text/html;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "AI_產業情報專刊_互動式簡報.html";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      });
+    }
+  </script>
+</body>
+</html>
