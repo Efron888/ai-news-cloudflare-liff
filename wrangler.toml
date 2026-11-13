@@ -1,6 +1,10 @@
 name = "ai-news-cloudflare-liff"
-pages_build_output_dir = "public"
+main = "src/worker.js"
 compatibility_date = "2024-11-01"
+
+[assets]
+directory = "./public"
+binding = "ASSETS"
 
 [ai]
 binding = "AI"
