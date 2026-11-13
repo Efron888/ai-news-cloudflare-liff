@@ -66,7 +66,7 @@
           <i data-lucide="file-down" class="w-3.5 h-3.5"></i>
           <span>下載 PDF</span>
         </a>
-        <a id="download-html-btn" href="downloads/AI_News_Interactive_Slides.html" download="AI_產業情報專刊_互動式簡報.html" class="flex items-center space-x-1 bg-amber-500 hover:bg-amber-400 text-slate-950 px-3 py-1.5 rounded-lg text-xs font-bold shadow transition">
+        <a id="download-html-btn" href="/api/download-html" download="AI_產業情報專刊_互動式簡報.html" class="flex items-center space-x-1 bg-amber-500 hover:bg-amber-400 text-slate-950 px-3 py-1.5 rounded-lg text-xs font-bold shadow transition">
           <i data-lucide="code" class="w-3.5 h-3.5"></i>
           <span>下載 HTML 簡報</span>
         </a>
@@ -483,50 +483,35 @@
       });
 
       // 一鍵下載獨立 HTML 簡報檔 (支援 iPhone iOS Safari / LINE LIFF / 電腦全平台)
-      document.getElementById("download-html-btn").addEventListener("click", async (e) => {
-        const isCloudflareWorker = location.hostname.endsWith(".workers.dev") || location.hostname.endsWith(".pages.dev");
-        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+      const dlHtmlBtn = document.getElementById("download-html-btn");
+      const isCloudflareWorker = location.hostname.endsWith(".workers.dev") || location.hostname.endsWith(".pages.dev");
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 
-        // 在 Cloudflare 網域上，直接由 Worker 回傳 Content-Disposition: attachment 觸發 iPhone 原生下載視窗 (與 PPTX 完全相同機制)
-        if (isCloudflareWorker) {
-          return; // 讓 <a href="downloads/AI_News_Interactive_Slides.html" download> 直接觸發伺服器附件下載
-        }
-
-        // 若在靜態預覽網域 (如 github.io) 或本地開啟：
-        e.preventDefault();
-        const htmlContent = "<!DOCTYPE html>\n" + document.documentElement.outerHTML;
-        const fileName = "AI_產業情報專刊_互動式簡報.html";
-
-        // iPhone / iOS 優先呼叫原生「分享 / 儲存到檔案」面板
-        if (isIOS && navigator.canShare) {
-          try {
-            const file = new File([htmlContent], fileName, { type: "text/html" });
-            if (navigator.canShare({ files: [file] })) {
-              await navigator.share({
-                files: [file],
-                title: "AI 產業情報專刊 — 互動式簡報",
-                text: "點擊「儲存到檔案」即可下載 HTML 簡報"
-              });
-              return;
-            }
-          } catch (err) {
-            if (err && err.name === "AbortError") return;
-          }
-        }
-
-        // 桌機與一般瀏覽器：延遲 60 秒再釋放 Blob URL，避免手機端非同步下載被中斷
-        const blob = new Blob([htmlContent], { type: "application/octet-stream" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = fileName;
-        document.body.appendChild(a);
-        a.click();
-        setTimeout(() => {
-          document.body.removeChild(a);
-          URL.revokeObjectURL(url);
-        }, 60000);
-      });
+      if (isCloudflareWorker) {
+        // 在 Cloudflare 上直接連向 /api/download-html，由 Worker 讀取二進位檔回傳 attachment (零 JS 攔截，與 PPTX 完全相同)
+        dlHtmlBtn.href = "/api/download-html";
+      } else if (isIOS) {
+        // 在靜態網域 (如 github.io) 的 iPhone 上，直接連向實體壓縮檔 (與 PPTX 完全相同機制，100% 觸發 iOS 原生下載)
+        dlHtmlBtn.href = "downloads/AI_News_Interactive_Slides.zip";
+        dlHtmlBtn.setAttribute("download", "AI_產業情報專刊_互動式簡報_HTML.zip");
+      } else {
+        // 電腦版於靜態網域開啟時，直接觸發 Blob 下載 .html
+        dlHtmlBtn.addEventListener("click", (e) => {
+          e.preventDefault();
+          const htmlContent = "<!DOCTYPE html>\n" + document.documentElement.outerHTML;
+          const blob = new Blob([htmlContent], { type: "text/html;charset=utf-8" });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = "AI_產業情報專刊_互動式簡報.html";
+          document.body.appendChild(a);
+          a.click();
+          setTimeout(() => {
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+          }, 60000);
+        });
+      }
     }
   </script>
 </body>

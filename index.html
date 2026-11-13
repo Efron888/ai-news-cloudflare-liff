@@ -39,7 +39,7 @@
       
       <!-- 頂部功能按鈕群：簡報、AI問答、問題回報、設定主題 -->
       <div class="flex items-center space-x-1.5">
-        <a href="presentation.html" class="flex items-center space-x-1 bg-amber-400 hover:bg-amber-300 text-slate-950 px-2.5 py-1.5 rounded-full text-[11px] font-bold transition shadow-sm" title="開啟互動簡報與下載">
+        <a href="presentation.html?v=4" class="flex items-center space-x-1 bg-amber-400 hover:bg-amber-300 text-slate-950 px-2.5 py-1.5 rounded-full text-[11px] font-bold transition shadow-sm" title="開啟互動簡報與下載">
           <i data-lucide="presentation" class="w-3.5 h-3.5"></i>
           <span>簡報</span>
         </a>
@@ -71,7 +71,7 @@
         </div>
         <p class="text-[11px] text-blue-100">支援網頁點擊翻頁，並可下載 Canva PPTX / PDF / HTML</p>
       </div>
-      <a href="presentation.html" class="shrink-0 bg-white text-[#0F3B82] hover:bg-blue-50 font-bold text-xs px-3 py-2 rounded-xl shadow transition flex items-center space-x-1">
+      <a href="presentation.html?v=4" class="shrink-0 bg-white text-[#0F3B82] hover:bg-blue-50 font-bold text-xs px-3 py-2 rounded-xl shadow transition flex items-center space-x-1">
         <span>點此開啟</span>
         <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
       </a>
@@ -299,7 +299,7 @@
   <footer class="mt-auto py-4 text-center text-slate-400 text-[11px] space-y-1">
     <div>由 Cloudflare Pages & Workers AI × LINE LIFF × Notion 雲端驅動</div>
     <div>
-      <a href="presentation.html" class="text-blue-600 hover:underline font-semibold">📊 點此開啟產品介紹 HTML 互動簡報（可下載 PPTX / PDF）</a>
+      <a href="presentation.html?v=4" class="text-blue-600 hover:underline font-semibold">📊 點此開啟產品介紹 HTML 互動簡報（可下載 PPTX / PDF）</a>
     </div>
   </footer>
 
@@ -395,10 +395,10 @@
       await fetchUserDataAndNews();
     }
 
-    async function fetchUserDataAndNews() {
+    async function fetchUserDataAndNews(forceFresh = false) {
       showLoading(true);
       try {
-        const liveNews = await fetchLiveGoogleNewsRSS(currentUser.keywords);
+        const liveNews = await fetchLiveGoogleNewsRSS(currentUser.keywords, forceFresh);
         if (liveNews && liveNews.length > 0) {
           renderNewsCards(liveNews);
         } else {
@@ -412,17 +412,53 @@
       }
     }
 
-    // 前端即時抓取 Google News RSS (含 24h 最新 when:1d 與歷史防重複過濾)
-    async function fetchLiveGoogleNewsRSS(keywords) {
+    // 前端即時抓取 Google News RSS (優先透過 Cloudflare Worker 即時直連無快取，支援強制換新與防重複)
+    async function fetchLiveGoogleNewsRSS(keywords, forceFresh = false) {
       const cleanKeywords = (keywords || APP_CONFIG.DEFAULT_KEYWORDS).trim();
-      const encodedQuery = encodeURIComponent(`${cleanKeywords} when:1d`);
-      const rssTarget = `https://news.google.com/rss/search?q=${encodedQuery}&hl=zh-TW&gl=TW&ceid=TW:zh-Hant`;
       
       let seenTitles = [];
       try {
         seenTitles = JSON.parse(localStorage.getItem("ai_news_seen_history") || "[]");
       } catch (e) {}
 
+      // 若點擊「立即更新」或「排程時間觸發」，將目前畫面上的新聞納入已讀排除清單，確保一定換上最新不同新聞
+      if (forceFresh) {
+        const onScreenTitles = Array.from(document.querySelectorAll('#news-list h2')).map(el => el.innerText.trim());
+        onScreenTitles.forEach(t => {
+          if (t && !seenTitles.includes(t)) seenTitles.push(t);
+        });
+      }
+
+      // 1. 優先呼叫 Cloudflare Worker 後端直連 Google News RSS (無第三方 1 小時快取延遲)
+      try {
+        const workerRes = await fetch(APP_CONFIG.WEBHOOK_API_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "fetchNews",
+            keywords: cleanKeywords,
+            seenTitles: forceFresh ? seenTitles : []
+          })
+        });
+        if (workerRes.ok) {
+          const workerData = await workerRes.json();
+          if (workerData && workerData.items && workerData.items.length > 0) {
+            workerData.items.forEach(r => {
+              if (!seenTitles.includes(r.title)) seenTitles.push(r.title);
+            });
+            if (seenTitles.length > 40) seenTitles = seenTitles.slice(-40);
+            try {
+              localStorage.setItem("ai_news_seen_history", JSON.stringify(seenTitles));
+              localStorage.setItem("ai_news_live_cache", JSON.stringify(workerData.items));
+            } catch (e) {}
+            return workerData.items;
+          }
+        }
+      } catch (e) {}
+
+      // 2. 備援：透過 rss2json 檢索 (加入時間戳破除快取)
+      const encodedQuery = encodeURIComponent(`${cleanKeywords} when:7d`);
+      const rssTarget = `https://news.google.com/rss/search?q=${encodedQuery}&hl=zh-TW&gl=TW&ceid=TW:zh-Hant`;
       const apiUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssTarget)}`;
       
       try {
@@ -631,8 +667,12 @@
         });
       });
 
-      // 立即更新動作
-      const performInstantUpdate = async (isFromModal = false) => {
+      // 立即更新動作 (支援手動點擊與排程時間自動觸發)
+      let isUpdatingNow = false;
+      const performInstantUpdate = async (isFromModal = false, isScheduled = false) => {
+        if (isUpdatingNow) return;
+        isUpdatingNow = true;
+
         const btn = isFromModal ? saveAndRefreshBtn : instantUpdateBtn;
         const originalContent = btn.innerHTML;
         btn.disabled = true;
@@ -643,41 +683,76 @@
           currentUser.keywords = customKeywordsInput.value.trim() || APP_CONFIG.DEFAULT_KEYWORDS;
           currentUser.pushTime = customTimeInput.value || "08:00";
           saveSettingsLocally();
+          localStorage.removeItem("ai_news_last_scheduled_run");
           settingsModal.classList.add('hidden');
           settingsModal.classList.remove('flex');
-
-          // 同步發送至 Cloudflare Functions API 更新 Notion
-          fetch(APP_CONFIG.WEBHOOK_API_URL, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              action: "updateKeywords",
-              userId: currentUser.userId,
-              keywords: currentUser.keywords
-            })
-          }).catch(() => {});
         }
 
-        showToast("⚡ 正在檢索過去 24 小時最新且不重複新聞...");
-        await fetchUserDataAndNews();
+        // 同步發送至 Cloudflare Functions API 更新 Notion
+        fetch(APP_CONFIG.WEBHOOK_API_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "updateKeywords",
+            userId: currentUser.userId,
+            keywords: currentUser.keywords
+          })
+        }).catch(() => {});
+
+        if (isScheduled) {
+          showToast(`⏰ 已達排程時間 (${currentUser.pushTime})，正在自動更新最新新聞...`);
+        } else {
+          showToast("⚡ 正在檢索過去 24 小時最新且不重複新聞...");
+        }
+
+        await fetchUserDataAndNews(true);
 
         btn.disabled = false;
         btn.innerHTML = originalContent;
         lucide.createIcons();
-        showToast("✅ 專屬新聞已即時更新完成！");
+        isUpdatingNow = false;
+        showToast(isScheduled ? `✅ 每日 ${currentUser.pushTime} 排程新聞已自動更新完成！` : "✅ 專屬新聞已即時更新完成！");
       };
 
-      instantUpdateBtn.addEventListener('click', () => performInstantUpdate(false));
-      saveAndRefreshBtn.addEventListener('click', () => performInstantUpdate(true));
+      instantUpdateBtn.addEventListener('click', () => performInstantUpdate(false, false));
+      saveAndRefreshBtn.addEventListener('click', () => performInstantUpdate(true, false));
 
       saveSettingsOnlyBtn.addEventListener('click', () => {
         currentUser.keywords = customKeywordsInput.value.trim() || APP_CONFIG.DEFAULT_KEYWORDS;
         currentUser.pushTime = customTimeInput.value || "08:00";
         saveSettingsLocally();
+        localStorage.removeItem("ai_news_last_scheduled_run");
         settingsModal.classList.add('hidden');
         settingsModal.classList.remove('flex');
-        showToast(`✅ 設定已儲存（每日 ${currentUser.pushTime} 更新）`);
+        fetch(APP_CONFIG.WEBHOOK_API_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "updateKeywords",
+            userId: currentUser.userId,
+            keywords: currentUser.keywords
+          })
+        }).catch(() => {});
+        showToast(`✅ 設定已儲存！將於 ${currentUser.pushTime} 自動更新新聞`);
       });
+
+      // 每日排程時間自動觸發監聽器 (每秒精準比對系統時間 HH:MM)
+      setInterval(() => {
+        if (!currentUser.pushTime || isUpdatingNow) return;
+        const now = new Date();
+        const hh = String(now.getHours()).padStart(2, '0');
+        const mm = String(now.getMinutes()).padStart(2, '0');
+        const currentHHMM = `${hh}:${mm}`;
+        const todayKey = `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}_${currentHHMM}_${currentUser.keywords}`;
+
+        if (currentHHMM === currentUser.pushTime) {
+          const lastRun = localStorage.getItem("ai_news_last_scheduled_run");
+          if (lastRun !== todayKey) {
+            localStorage.setItem("ai_news_last_scheduled_run", todayKey);
+            performInstantUpdate(false, true);
+          }
+        }
+      }, 1000);
 
       // AI 問答送出邏輯
       const handleAskAI = async () => {

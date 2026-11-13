@@ -10,24 +10,25 @@ export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
 
-    // 1. 專供 iPhone / iOS 與全平台強制下載獨立 HTML 簡報檔 (回傳 attachment 標頭，與 PPTX/PDF 機制一致)
+    // 1. 專供 iPhone / iOS 與全平台強制下載獨立 HTML 簡報檔 (讀取 .bin 避開 Cloudflare HTML 307 重導向，確保完整回傳 28KB 檔案與 attachment 標頭)
     if (url.pathname === '/api/download-html' || url.pathname === '/downloads/AI_News_Interactive_Slides.html') {
       if (env.ASSETS) {
-        const assetUrl = new URL('/presentation.html', request.url);
+        const assetUrl = new URL('/downloads/slides_deck.bin', request.url);
         const assetRes = await env.ASSETS.fetch(new Request(assetUrl.toString()));
         const htmlBytes = await assetRes.arrayBuffer();
         return new Response(htmlBytes, {
           status: 200,
           headers: {
             'Content-Type': 'application/octet-stream',
-            'Content-Disposition': "attachment; filename=\"AI_News_Interactive_Slides.html\"; filename*=UTF-8''AI_%E7%94%A2%E6%A5%AD%E6%83%85%E5%A0%B1%E5%B0%88%E5%88%8A_%E4%BA%92%E5%8B%95%E5%BC%8F%E7%B0%A1%E5%A0%B1.html",
-            'Cache-Control': 'no-cache'
+            'Content-Disposition': 'attachment; filename="AI_News_Interactive_Slides.html"',
+            'Content-Length': String(htmlBytes.byteLength),
+            'Cache-Control': 'no-store, no-cache, must-revalidate'
           }
         });
       }
     }
 
-    // 2. LINE Messaging API Webhook 與 Cloudflare 免費 AI 問答 API
+    // 2. LINE Messaging API Webhook 與 Cloudflare 免費 AI 問答 / 新聞直連 API
     if (url.pathname === '/api/webhook' || url.pathname === '/webhook') {
       if (request.method === 'OPTIONS') {
         return new Response(null, { status: 204, headers: corsHeaders });

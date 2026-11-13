@@ -88,6 +88,11 @@ async function handleLiffAction(body, env) {
     "Access-Control-Allow-Headers": "Content-Type"
   };
 
+  if (body.action === "fetchNews") {
+    const items = await fetchFreshGoogleNews(body.keywords || "具身機器人", body.seenTitles || []);
+    return new Response(JSON.stringify({ success: true, items }), { headers: corsHeaders });
+  }
+
   if (body.action === "askAI") {
     const answer = await runCloudflareFreeAI(
       body.question || "你好",
@@ -268,4 +273,82 @@ async function syncKeywordsToNotion(userId, keywords, env) {
   } catch (e) {
     return false;
   }
+}
+
+/**
+ * 伺服器端直接從 Google News RSS 抓取最新且不重複的新聞 (無第三方快取延遲)
+ */
+async function fetchFreshGoogleNews(keywords, seenTitles = []) {
+  const cleanKw = (keywords || "具身機器人").trim();
+  const seenSet = new Set(Array.isArray(seenTitles) ? seenTitles : []);
+  const queries = [`${cleanKw} when:1d`, `${cleanKw} when:7d`, cleanKw];
+  const collected = [];
+
+  for (const q of queries) {
+    try {
+      const rssUrl = `https://news.google.com/rss/search?q=${encodeURIComponent(q)}&hl=zh-TW&gl=TW&ceid=TW:zh-Hant&_t=${Date.now()}`;
+      const res = await fetch(rssUrl, {
+        headers: { "User-Agent": "Mozilla/5.0 (compatible; CloudflareWorker/1.0)" }
+      });
+      if (!res.ok) continue;
+      const xml = await res.text();
+      const itemRegex = /<item>([\s\S]*?)<\/item>/g;
+      let match;
+      const parsedItems = [];
+
+      while ((match = itemRegex.exec(xml)) !== null) {
+        const block = match[1];
+        const rawTitle = (block.match(/<title>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/title>/) || [])[1] || "";
+        const link = (block.match(/<link>([\s\S]*?)<\/link>/) || [])[1] || "https://news.google.com";
+        const pubDateRaw = (block.match(/<pubDate>([\s\S]*?)<\/pubDate>/) || [])[1] || "";
+        const sourceTag = (block.match(/<source[^>]*>([\s\S]*?)<\/source>/) || [])[1] || "";
+
+        let title = rawTitle
+          .replace(/&amp;/g, "&")
+          .replace(/&quot;/g, '"')
+          .replace(/&#39;/g, "'")
+          .replace(/&lt;/g, "<")
+          .replace(/&gt;/g, ">")
+          .trim();
+        let source = sourceTag.trim() || "焦點快訊";
+
+        if (title.includes(" - ")) {
+          const parts = title.split(" - ");
+          const lastPart = parts.pop().trim();
+          if (!sourceTag) source = lastPart;
+          title = parts.join(" - ").trim();
+        }
+        if (!title) continue;
+
+        const ts = pubDateRaw ? Date.parse(pubDateRaw) || 0 : 0;
+        let dateStr = "今日最新";
+        if (ts > 0) {
+          const d = new Date(ts + 8 * 3600 * 1000);
+          dateStr = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")} ${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}`;
+        }
+
+        parsedItems.push({ title, link: link.trim(), source, pubDate: dateStr, ts });
+      }
+
+      // 依發布時間由新到舊排序
+      parsedItems.sort((a, b) => b.ts - a.ts);
+
+      for (const item of parsedItems) {
+        if (!seenSet.has(item.title) && !collected.some(c => c.title === item.title)) {
+          collected.push({
+            title: item.title,
+            link: item.link,
+            source: item.source,
+            pubDate: item.pubDate,
+            summary: `【即時快訊】針對「${cleanKw}」最新動態：${item.title}。相關單位與市場正密切關注後續發展與實務應用。`,
+            impact: `關注「${cleanKw}」領域之讀者，建議評估最新時程動向、資源配置與後續衍生商機。`
+          });
+          if (collected.length >= 3) break;
+        }
+      }
+      if (collected.length >= 3) break;
+    } catch (e) {}
+  }
+
+  return collected;
 }
