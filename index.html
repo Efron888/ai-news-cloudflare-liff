@@ -23,36 +23,33 @@
 
   <!-- 頂部導航欄 (Fixed Header) -->
   <header class="sticky top-0 z-40 bg-[#0F3B82] text-white shadow-md">
-    <div class="max-w-md mx-auto px-3.5 py-3 flex items-center justify-between">
-      <div class="flex items-center space-x-2">
-        <div class="bg-blue-600 p-1.5 rounded-lg flex items-center justify-center">
-          <i data-lucide="newspaper" class="w-5 h-5 text-white"></i>
+    <div class="max-w-md mx-auto px-3 py-3 flex items-center justify-between gap-2">
+      <div class="flex items-center space-x-2 min-w-0">
+        <div class="bg-blue-600 p-1.5 rounded-lg flex items-center justify-center shrink-0">
+          <i data-lucide="newspaper" class="w-4 h-4 text-white"></i>
         </div>
-        <div>
-          <div class="flex items-center space-x-1.5">
-            <h1 class="text-sm font-bold tracking-tight">AI 產業情報專刊</h1>
-            <span class="bg-orange-500/90 text-white text-[9px] px-1.5 py-0.5 rounded font-bold">Cloudflare AI</span>
-          </div>
-          <p id="current-date" class="text-[11px] text-blue-200">讀取中...</p>
+        <div class="min-w-0">
+          <h1 class="text-sm font-bold tracking-tight whitespace-nowrap">AI 產業情報專刊</h1>
+          <p id="current-date" class="text-[11px] text-blue-200 whitespace-nowrap">讀取中...</p>
         </div>
       </div>
       
       <!-- 頂部功能按鈕群：簡報、AI問答、問題回報、設定主題 -->
-      <div class="flex items-center space-x-1.5">
-        <a href="presentation.html?v=4" class="flex items-center space-x-1 bg-amber-400 hover:bg-amber-300 text-slate-950 px-2.5 py-1.5 rounded-full text-[11px] font-bold transition shadow-sm" title="開啟互動簡報與下載">
-          <i data-lucide="presentation" class="w-3.5 h-3.5"></i>
+      <div class="flex items-center space-x-1 shrink-0">
+        <a href="presentation.html?v=4" class="flex items-center space-x-1 bg-amber-400 hover:bg-amber-300 text-slate-950 px-2 py-1.5 rounded-full text-[11px] font-bold transition shadow-sm whitespace-nowrap" title="開啟互動簡報與下載">
+          <i data-lucide="presentation" class="w-3 h-3"></i>
           <span>簡報</span>
         </a>
-        <button id="open-ai-qa-btn" class="flex items-center space-x-1 bg-cyan-500 hover:bg-cyan-400 text-slate-950 px-2.5 py-1.5 rounded-full text-[11px] font-bold transition shadow-sm" title="Cloudflare 免費 AI 問答">
-          <i data-lucide="bot" class="w-3.5 h-3.5"></i>
+        <button id="open-ai-qa-btn" class="flex items-center space-x-1 bg-cyan-500 hover:bg-cyan-400 text-slate-950 px-2 py-1.5 rounded-full text-[11px] font-bold transition shadow-sm whitespace-nowrap" title="Cloudflare 免費 AI 問答">
+          <i data-lucide="bot" class="w-3 h-3"></i>
           <span>問答</span>
         </button>
-        <button id="open-issue-btn" class="flex items-center space-x-1 bg-white/15 hover:bg-white/25 text-white px-2.5 py-1.5 rounded-full text-[11px] font-medium border border-white/20 transition" title="問題回報">
-          <i data-lucide="message-square-warning" class="w-3.5 h-3.5"></i>
+        <button id="open-issue-btn" class="flex items-center space-x-1 bg-white/15 hover:bg-white/25 text-white px-2 py-1.5 rounded-full text-[11px] font-medium border border-white/20 transition whitespace-nowrap" title="問題回報">
+          <i data-lucide="message-square-warning" class="w-3 h-3"></i>
           <span>回報</span>
         </button>
-        <button id="open-settings-btn" class="flex items-center space-x-1 bg-white/15 hover:bg-white/25 text-white px-2.5 py-1.5 rounded-full text-[11px] font-medium border border-white/20 transition" title="設定主題與時間">
-          <i data-lucide="sliders-horizontal" class="w-3.5 h-3.5"></i>
+        <button id="open-settings-btn" class="flex items-center space-x-1 bg-white/15 hover:bg-white/25 text-white px-2 py-1.5 rounded-full text-[11px] font-medium border border-white/20 transition whitespace-nowrap" title="設定主題與時間">
+          <i data-lucide="sliders-horizontal" class="w-3 h-3"></i>
           <span>設定</span>
         </button>
       </div>
