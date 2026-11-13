@@ -234,8 +234,9 @@
 
       <!-- 快速提問範例 -->
       <div class="flex flex-wrap gap-1.5">
+        <button type="button" class="qa-sample-btn bg-blue-50 hover:bg-blue-100 text-[#0F3B82] text-[11px] px-2.5 py-1 rounded-lg border border-blue-200 transition" data-q="請幫我總結今天畫面上的新聞重點與影響！">📰 總結今日新聞重點</button>
         <button type="button" class="qa-sample-btn bg-blue-50 hover:bg-blue-100 text-[#0F3B82] text-[11px] px-2.5 py-1 rounded-lg border border-blue-200 transition" data-q="什麼是具身機器人？對台灣製造業有何幫助？">💡 什麼是具身機器人？</button>
-        <button type="button" class="qa-sample-btn bg-blue-50 hover:bg-blue-100 text-[#0F3B82] text-[11px] px-2.5 py-1 rounded-lg border border-blue-200 transition" data-q="台灣人工智慧基本法對製造業有什麼影響？">⚖️ AI 基本法對製造業影響？</button>
+        <button type="button" class="qa-sample-btn bg-blue-50 hover:bg-blue-100 text-[#0F3B82] text-[11px] px-2.5 py-1 rounded-lg border border-blue-200 transition" data-q="把今天第一則新聞的重點翻譯成英文與日文">🌐 翻譯今日新聞重點</button>
       </div>
 
       <!-- 輸入框與送出 -->
@@ -703,10 +704,16 @@
 
         let answer = "";
         try {
+          const newsCards = Array.from(document.querySelectorAll('#news-list h3')).map((h, i) => `${i + 1}. ${h.innerText}`).join('\n');
           const res = await fetch(APP_CONFIG.WEBHOOK_API_URL, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ action: "askAI", question: q })
+            body: JSON.stringify({
+              action: "askAI",
+              question: q,
+              keywords: currentUser.keywords,
+              newsContext: newsCards
+            })
           });
           if (res.ok) {
             const data = await res.json();
